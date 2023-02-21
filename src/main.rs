@@ -3,6 +3,7 @@ use std::error::Error;
 
 use futures::stream::{FuturesUnordered,StreamExt};
 use std::collections::HashMap;
+use evdev::{Device, EventStream, InputEvent};
 
 fn print_list_item(path: &str, phy_path: &str, name: &str){
     println!("| {0: <20} | {1:<30} | {2:}",path, phy_path, name)
@@ -25,22 +26,39 @@ fn list_dev_paths(){
     }
 }
 
-fn find_dev_by_path(path: &str) -> evdev::Device {
-    evdev::Device::open(path).unwrap()
+// fn list_dev_properties(path: String){
+
+//     let device = Device::open(path).unwrap();
+
+//     println!("{:?}", device.supported_keys());
+//     let name = device.name();
+//     let path = device.to_string();
+//     println!("using device {} ({})", path, name.unwrap());
+// }
+
+
+fn open_devices(paths: Vec<String>) -> HashMap<String, Device>{
+    paths
+        .iter()
+        .map(|path| (path.to_owned(), Device::open(path).unwrap()))
+        .collect()
 }
 
-async fn combine_devices(devices: Vec<evdev::Device>)-> Result<(), Box<dyn Error>>{
-    for device in devices.iter(){
-        println!("{:?}", device.supported_keys());
-        let name = device.name();
-        let path = device.to_string();
-        println!("using device {} ({})", path, name.unwrap());
-    }
+async fn next_event_with_meta(path: &String, stream: &mut EventStream) -> (String, InputEvent) {
+    (path.to_owned(), stream.next_event().await.unwrap())
+}
 
-    let mut streams: Vec<_> = devices.into_iter().map(|d| d.into_event_stream().unwrap()).collect();
+async fn combine_devices(devices: HashMap<String, Device>)-> Result<(), Box<dyn Error>>{
+    let mut streams: HashMap<_,_> = devices
+        .into_iter()
+        .map(|(p, d)| (p, d.into_event_stream().unwrap()))
+        .collect();
 
     loop {
-        let mut futures = FuturesUnordered::from_iter(streams.iter_mut().map(|s| s.next_event()));
+        let mut futures = FuturesUnordered::from_iter(
+            streams
+                .iter_mut()
+                .map(|(p, s)| next_event_with_meta(p, s)));
 
         let ev = futures.next().await.unwrap();
         println!("{:?}", ev);
@@ -58,7 +76,7 @@ async fn main()-> Result<(), Box<dyn Error>> {
     }
     else {
         let paths = args.as_slice()[1..].to_vec();
-        let devs:Vec<_> = paths.iter().map(|path| find_dev_by_path(path)).collect();
-        combine_devices(devs).await
+        let paths_and_devs = open_devices(paths);
+        combine_devices(paths_and_devs).await
     }
 }
