@@ -9,3 +9,6 @@ edition = "2021"
 evdev = {version="0.12.0", features = ["tokio"]}
 tokio = { version = "1.21.2", features = ["full"] }
 futures = "0.3.24"
+serde = "1.0.152"
+serde_yaml = "0.9.17"
+clap = {version ="4.1.6", features = ["derive"]}

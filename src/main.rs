@@ -1,15 +1,30 @@
 
-use std::error::Error;
 
+use clap::Parser;
+use evdev::{Device, EventStream, InputEvent};
 use futures::stream::{FuturesUnordered,StreamExt};
 use std::collections::HashMap;
-use evdev::{Device, EventStream, InputEvent};
+use std::error::Error;
+
+/// Combine multiple input devices into a single virtual device
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// mode to run in [devices, properties, run]
+    #[arg(short, long)]
+    mode: Option<String>,
+
+    /// Device (required in properties mode)
+    #[arg(short, long)]
+    device: Option<String>
+ }
+
 
 fn print_list_item(path: &str, phy_path: &str, name: &str){
     println!("| {0: <20} | {1:<30} | {2:}",path, phy_path, name)
 }
 
-fn list_dev_paths(){
+fn list_devices(){
     let devices = evdev::enumerate().collect::<HashMap<_,_>>();
     // readdir returns them in reverse order from their eventN names for some reason
     print_list_item("path", "physical path", "name");
@@ -26,16 +41,24 @@ fn list_dev_paths(){
     }
 }
 
-// fn list_dev_properties(path: String){
+fn list_properties(path: String){
+    let device = Device::open(path).unwrap();
+    println!("Device: {}", device.name().unwrap_or("unknown"));
 
-//     let device = Device::open(path).unwrap();
+    if let Some(all_axis) = device.supported_keys(){
+        println!("Keys:");
+        for axis in all_axis.iter(){
+            println!("\t{:?}", axis)
+        }
+    }
 
-//     println!("{:?}", device.supported_keys());
-//     let name = device.name();
-//     let path = device.to_string();
-//     println!("using device {} ({})", path, name.unwrap());
-// }
-
+    if let Some(all_axis) = device.supported_absolute_axes(){
+        println!("Absolute axis:");
+        for axis in all_axis.iter(){
+            println!("\t{:?}", axis)
+        }
+    }
+}
 
 fn open_devices(paths: Vec<String>) -> HashMap<String, Device>{
     paths
@@ -65,18 +88,27 @@ async fn combine_devices(devices: HashMap<String, Device>)-> Result<(), Box<dyn 
     }
 }
 
+async fn run(device: &str)-> Result<(), Box<dyn Error>>{
+    let devices = Vec::from([device.to_owned()]);
+    let paths_and_devs = open_devices(devices);
+
+    combine_devices(paths_and_devs).await
+}
+
 #[tokio::main]
 async fn main()-> Result<(), Box<dyn Error>> {
-    use std::env;
-    let args: Vec<String> = env::args().collect();
-    println!("args {:?}", args);
-    if args[1] == "--list" {
-        list_dev_paths();
+    let args = Args::parse();
+    let mode = args.mode.as_deref().unwrap_or("run");
+    if mode == "devices" {
+        list_devices();
+        Ok(())
+    }
+    else if mode == "properties" {
+        list_properties(args.device.unwrap());
         Ok(())
     }
     else {
-        let paths = args.as_slice()[1..].to_vec();
-        let paths_and_devs = open_devices(paths);
-        combine_devices(paths_and_devs).await
+        run(args.device.as_deref().unwrap()).await.unwrap();
+        Ok(())
     }
 }
