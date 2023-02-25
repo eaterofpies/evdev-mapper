@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File};
 use serde::Deserialize;
 
-use crate::event::{LocAbsAxis, LocKey};
+use crate::event::{AbsAxis, Key};
 
 #[derive(Debug, Deserialize)]
 struct Config {
@@ -23,11 +23,12 @@ struct EventMapping {
 #[derive(Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum ControllerEvent{
-    AbsAxis(LocAbsAxis),
-    Key(LocKey),
+    AbsAxis(AbsAxis),
+    Key(Key),
 }
 
-pub fn read() -> HashMap<String, HashMap<ControllerEvent,ControllerEvent>>{
+pub type ConfigMap = HashMap<String, HashMap<ControllerEvent,ControllerEvent>>;
+pub fn read() -> ConfigMap{
     let file = File::open("device.conf").unwrap();
     let config: Config = serde_yaml::from_reader(file).expect("Could not read values.");
 

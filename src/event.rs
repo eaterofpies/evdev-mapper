@@ -1,15 +1,12 @@
 use std::ops::Deref;
-use evdev::{AbsoluteAxisType, Key};
+use evdev::AbsoluteAxisType;
 use std::hash::{Hash, Hasher};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-pub struct LocAbsAxis(pub AbsoluteAxisType);
+pub struct AbsAxis(pub AbsoluteAxisType);
 
-#[derive(Debug, Deserialize)]
-pub struct LocKey(pub Key);
-
-impl Deref for LocAbsAxis {
+impl Deref for AbsAxis {
     type Target = AbsoluteAxisType;
 
     fn deref(&self) -> &Self::Target{
@@ -17,43 +14,46 @@ impl Deref for LocAbsAxis {
     }
 }
 
-impl Eq for LocAbsAxis {
+impl Eq for AbsAxis {
 }
 
 
-impl Hash for LocAbsAxis {
+impl Hash for AbsAxis {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.0.hash(state)
     }
 }
 
-impl PartialEq for LocAbsAxis {
-    fn eq(&self, other: &LocAbsAxis) -> bool{
+impl PartialEq for AbsAxis {
+    fn eq(&self, other: &AbsAxis) -> bool{
         self.0 == other.0
     }
 }
 
 
-impl Deref for LocKey {
-    type Target = Key;
+#[derive(Debug, Deserialize)]
+pub struct Key(pub evdev::Key);
+
+impl Deref for Key {
+    type Target = evdev::Key;
 
     fn deref(&self) -> &Self::Target{
         &self.0
     }
 }
 
-impl Eq for LocKey {
+impl Eq for Key {
 }
 
-impl Hash for LocKey {
+impl Hash for Key {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state)
     }
 }
 
 
-impl PartialEq for LocKey {
-    fn eq(&self, other: &LocKey) -> bool{
+impl PartialEq for Key {
+    fn eq(&self, other: &Key) -> bool{
         self.0 == other.0
     }
 }
