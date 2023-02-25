@@ -3,7 +3,8 @@ mod event;
 mod config;
 mod device;
 
-use evdev::{Device, EventStream, InputEvent, InputEventKind};
+use evdev::{Device, EventStream, InputEvent, InputEventKind, AttributeSet};
+use evdev::uinput::{VirtualDeviceBuilder, VirtualDevice};
 use futures::stream::{FuturesUnordered,StreamExt};
 
 use std::collections::HashMap;
@@ -48,6 +49,9 @@ async fn combine_devices(devices: HashMap<String, Device>, mappings: ConfigMap)-
         .map(|(p, d)| (p, d.into_event_stream().unwrap()))
         .collect();
 
+    let mut output_device = setup_output(&mappings);
+
+
     loop {
         // Setup futures for the event sources
         let mut futures = FuturesUnordered::from_iter(
@@ -57,8 +61,16 @@ async fn combine_devices(devices: HashMap<String, Device>, mappings: ConfigMap)-
 
         // wait for an event
         let path_and_event = futures.next().await.unwrap();
+        let output_event = interpret_event(&path_and_event.0, &path_and_event.1, &mappings);
 
-        interpret_event(&path_and_event.0, &path_and_event.1, &mappings)
+        if let Some(output_event) = output_event {
+            if let ControllerEvent::Key(k) = output_event {
+                let message = InputEvent::new(evdev::EventType::KEY,k.code(),path_and_event.1.value());
+                output_device.emit(&[message]).unwrap()
+
+            }
+        }
+
     }
 }
 
@@ -66,7 +78,37 @@ async fn next_event_with_meta(path: &String, stream: &mut EventStream) -> (Strin
     (path.to_owned(), stream.next_event().await.unwrap())
 }
 
-fn interpret_event(path: &String, event: &InputEvent, device_mappings: &ConfigMap){
+fn setup_output(config: &ConfigMap) -> VirtualDevice{
+    let mut output_events: Vec<&config::ControllerEvent> = Vec::new();
+    for mappings in config.values() {
+        let dev_events: Vec<_> = mappings.iter().map(|(_i, o)| o).collect();
+        output_events.extend(dev_events);
+    }
+
+
+    let mut keys: AttributeSet<evdev::Key> = AttributeSet::new();
+
+    for event in output_events {
+        match event {
+            ControllerEvent::AbsAxis(_a) => (),
+            ControllerEvent::Key(a) => keys.insert(a.0),
+        }
+    }
+
+    let builder = VirtualDeviceBuilder::new().unwrap();
+    let mut device = builder.name("evdev-mapper gamepad")
+        .with_keys(&keys).unwrap()
+        .build().unwrap();
+
+    for path in device.enumerate_dev_nodes_blocking().unwrap() {
+            let path = path.unwrap();
+            println!("Available as {}", path.display());
+    }
+
+    device
+}
+
+fn interpret_event(path: &String, event: &InputEvent, device_mappings: &ConfigMap) -> Option<ControllerEvent>{
     // Make a ControllerEvent from the input
     let maybe_input_event = match event.kind(){
         InputEventKind::AbsAxis(a) => Option::from(ControllerEvent::AbsAxis(AbsAxis(a))),
@@ -78,12 +120,10 @@ fn interpret_event(path: &String, event: &InputEvent, device_mappings: &ConfigMa
     if let Some(input_event) = maybe_input_event {
         if let Some(event_mapping) = device_mappings.get(path){
             if let Some(output_event) = event_mapping.get(&input_event) {
-                println!("event = {:?}", output_event)
+                return Some(output_event.to_owned());
             }
         }
     }
 
-    //Map the event
-    //config[path]
-    //println!("{:?}", path_and_event);
+    None
 }

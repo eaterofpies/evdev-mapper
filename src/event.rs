@@ -3,7 +3,7 @@ use evdev::AbsoluteAxisType;
 use std::hash::{Hash, Hasher};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct AbsAxis(pub AbsoluteAxisType);
 
 impl Deref for AbsAxis {
@@ -31,7 +31,7 @@ impl PartialEq for AbsAxis {
 }
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Key(pub evdev::Key);
 
 impl Deref for Key {

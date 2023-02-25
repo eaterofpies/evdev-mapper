@@ -20,7 +20,7 @@ struct EventMapping {
     output_event: ControllerEvent,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum ControllerEvent{
     AbsAxis(AbsAxis),
