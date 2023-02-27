@@ -2,18 +2,27 @@ mod args;
 mod event;
 mod config;
 mod device;
+mod mapping;
+mod uinput;
 
-use evdev::{Device, EventStream, InputEvent, InputEventKind, AttributeSet};
-use evdev::uinput::{VirtualDeviceBuilder, VirtualDevice};
+use evdev::{Device, EventStream, InputEvent, InputEventKind};
 use futures::stream::{FuturesUnordered,StreamExt};
+use mapping::{make_mapping, EventMapping, OutputEvent};
 
-use std::collections::HashMap;
+
+use std::{collections::HashMap};
 use std::error::Error;
 
-use event::{AbsAxis, Key};
+use event::{AbsoluteAxisType, Key};
 use config::{ControllerEvent, ConfigMap};
+use uinput::new_device;
 use clap::Parser;
 
+#[derive(Debug)]
+pub enum NonFatalError{
+    Io(std::io::Error),
+    Str(String),
+}
 
 #[tokio::main]
 async fn main()-> Result<(), Box<dyn Error>> {
@@ -39,17 +48,19 @@ async fn run(config: ConfigMap)-> Result<(), Box<dyn Error>>{
     let paths: Vec<_>  = config.iter().map(|(p, _m)| p.to_owned()).collect();
     let paths_and_devs = device::open(paths);
 
-    combine_devices(paths_and_devs, config).await
+    let mappings = make_mapping(&config, &paths_and_devs);
+
+    combine_devices(paths_and_devs, mappings).await
 }
 
-async fn combine_devices(devices: HashMap<String, Device>, mappings: ConfigMap)-> Result<(), Box<dyn Error>>{
+async fn combine_devices(devices: HashMap<String, Device>, mappings: EventMapping)-> Result<(), Box<dyn Error>>{
     // Setup event streams
     let mut streams: HashMap<_,_> = devices
         .into_iter()
         .map(|(p, d)| (p, d.into_event_stream().unwrap()))
         .collect();
 
-    let mut output_device = setup_output(&mappings);
+    let mut output_device = new_device(&mappings);
 
 
     loop {
@@ -63,14 +74,43 @@ async fn combine_devices(devices: HashMap<String, Device>, mappings: ConfigMap)-
         let path_and_event = futures.next().await.unwrap();
         let output_event = interpret_event(&path_and_event.0, &path_and_event.1, &mappings);
 
-        if let Some(output_event) = output_event {
-            if let ControllerEvent::Key(k) = output_event {
-                let message = InputEvent::new(evdev::EventType::KEY,k.code(),path_and_event.1.value());
-                output_device.emit(&[message]).unwrap()
+        let message = match output_event{
+            Some(OutputEvent::AbsAxis(a)) => {
+                Ok(
+                    InputEvent::new(
+                        evdev::EventType::ABSOLUTE,
+                        a.axis_type.0.0,
+                        path_and_event.1.value()
+                    )
+                )
+            },
+            Some(OutputEvent::Key(k)) => {
+                Ok(
+                    InputEvent::new(
+                        evdev::EventType::KEY,
+                        k.code(),
+                        path_and_event.1.value()
+                    )
+                )
+            },
+            None => Err(NonFatalError::Str(format!("No handler for event type {:?}", path_and_event.1))),
+        };
 
-            }
+        let result  = match message {
+            Ok(ev) => {
+                println!("writing event {:?}", ev);
+                let res = output_device.emit(&[ev]);
+                match res {
+                    Ok(a) => Ok(a),
+                    Err(err) => Err(NonFatalError::Io(err)),
+                }
+            },
+            Err(err) => Err(err),
+        };
+
+        if let Err(e) = result {
+            println!("{:?}", e);
         }
-
     }
 }
 
@@ -78,49 +118,19 @@ async fn next_event_with_meta(path: &String, stream: &mut EventStream) -> (Strin
     (path.to_owned(), stream.next_event().await.unwrap())
 }
 
-fn setup_output(config: &ConfigMap) -> VirtualDevice{
-    let mut output_events: Vec<&config::ControllerEvent> = Vec::new();
-    for mappings in config.values() {
-        let dev_events: Vec<_> = mappings.iter().map(|(_i, o)| o).collect();
-        output_events.extend(dev_events);
-    }
-
-
-    let mut keys: AttributeSet<evdev::Key> = AttributeSet::new();
-
-    for event in output_events {
-        match event {
-            ControllerEvent::AbsAxis(_a) => (),
-            ControllerEvent::Key(a) => keys.insert(a.0),
-        }
-    }
-
-    let builder = VirtualDeviceBuilder::new().unwrap();
-    let mut device = builder.name("evdev-mapper gamepad")
-        .with_keys(&keys).unwrap()
-        .build().unwrap();
-
-    for path in device.enumerate_dev_nodes_blocking().unwrap() {
-            let path = path.unwrap();
-            println!("Available as {}", path.display());
-    }
-
-    device
-}
-
-fn interpret_event(path: &String, event: &InputEvent, device_mappings: &ConfigMap) -> Option<ControllerEvent>{
+fn interpret_event(path: &String, event: &InputEvent, event_mappings: &EventMapping) -> Option<OutputEvent>{
     // Make a ControllerEvent from the input
     let maybe_input_event = match event.kind(){
-        InputEventKind::AbsAxis(a) => Option::from(ControllerEvent::AbsAxis(AbsAxis(a))),
+        InputEventKind::AbsAxis(a) => Option::from(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
         InputEventKind::Key(a) => Option::from(ControllerEvent::Key(Key(a))),
         _ => None,
     };
 
     // Interpret the event
     if let Some(input_event) = maybe_input_event {
-        if let Some(event_mapping) = device_mappings.get(path){
+        if let Some(event_mapping) = event_mappings.get(path){
             if let Some(output_event) = event_mapping.get(&input_event) {
-                return Some(output_event.to_owned());
+                return Some(output_event.clone());
             }
         }
     }

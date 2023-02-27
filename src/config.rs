@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File};
 use serde::Deserialize;
 
-use crate::event::{AbsAxis, Key};
+use crate::event::{AbsoluteAxisType, Key};
 
 #[derive(Debug, Deserialize)]
 struct Config {
@@ -23,7 +23,7 @@ struct EventMapping {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum ControllerEvent{
-    AbsAxis(AbsAxis),
+    AbsAxis(AbsoluteAxisType),
     Key(Key),
 }
 

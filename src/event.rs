@@ -1,31 +1,30 @@
 use std::ops::Deref;
-use evdev::AbsoluteAxisType;
 use std::hash::{Hash, Hasher};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct AbsAxis(pub AbsoluteAxisType);
+pub struct AbsoluteAxisType(pub evdev::AbsoluteAxisType);
 
-impl Deref for AbsAxis {
-    type Target = AbsoluteAxisType;
+impl Deref for AbsoluteAxisType {
+    type Target = evdev::AbsoluteAxisType;
 
     fn deref(&self) -> &Self::Target{
         &self.0
     }
 }
 
-impl Eq for AbsAxis {
+impl Eq for AbsoluteAxisType {
 }
 
 
-impl Hash for AbsAxis {
+impl Hash for AbsoluteAxisType {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.0.hash(state)
     }
 }
 
-impl PartialEq for AbsAxis {
-    fn eq(&self, other: &AbsAxis) -> bool{
+impl PartialEq for AbsoluteAxisType {
+    fn eq(&self, other: &AbsoluteAxisType) -> bool{
         self.0 == other.0
     }
 }

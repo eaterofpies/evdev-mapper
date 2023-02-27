@@ -33,10 +33,13 @@ pub fn properties(path: String){
         }
     }
 
+    let abs_states = device.get_abs_state().unwrap().to_vec();
+
     if let Some(all_axis) = device.supported_absolute_axes(){
         println!("Absolute axis:");
         for axis in all_axis.iter(){
-            println!("\t{:?}", axis)
+            println!("\t{:?}: {:?}", axis, abs_states.get(axis.0 as usize).unwrap())
+
         }
     }
 }
