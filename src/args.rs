@@ -10,5 +10,5 @@ pub struct Args {
 
     /// Device (required in properties mode)
     #[arg(short, long)]
-    pub device: Option<String>
- }
+    pub device: Option<String>,
+}

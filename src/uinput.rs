@@ -1,7 +1,6 @@
-
-use evdev::uinput::{VirtualDeviceBuilder, VirtualDevice};
-use evdev::{AttributeSet, UinputAbsSetup};
 use crate::mapping::{EventMapping, OutputEvent};
+use evdev::uinput::{VirtualDevice, VirtualDeviceBuilder};
+use evdev::{AttributeSet, UinputAbsSetup};
 
 // Get a list of all of the possible outputs for the new device
 fn get_output_actions(dev_mappings: &EventMapping) -> Vec<&OutputEvent> {
@@ -14,7 +13,9 @@ fn get_output_actions(dev_mappings: &EventMapping) -> Vec<&OutputEvent> {
     output_actions
 }
 
-fn make_uniput_config(output_actions: Vec<&OutputEvent>) -> (Vec<UinputAbsSetup>, AttributeSet<evdev::Key>){
+fn make_uniput_config(
+    output_actions: Vec<&OutputEvent>,
+) -> (Vec<UinputAbsSetup>, AttributeSet<evdev::Key>) {
     // Need to build a list of all keys to pass to the builder
     // so we may as well extract the axis too
     let mut all_axis: Vec<UinputAbsSetup> = Vec::new();
@@ -24,7 +25,7 @@ fn make_uniput_config(output_actions: Vec<&OutputEvent>) -> (Vec<UinputAbsSetup>
             OutputEvent::AbsAxis(a) => {
                 let abs = UinputAbsSetup::new(a.axis_type.0, a.axis_info);
                 all_axis.push(abs)
-            },
+            }
             OutputEvent::Key(a) => keys.insert(a.0),
         }
     }
@@ -32,27 +33,28 @@ fn make_uniput_config(output_actions: Vec<&OutputEvent>) -> (Vec<UinputAbsSetup>
     (all_axis, keys)
 }
 
-fn build_device(all_axis: Vec<UinputAbsSetup>,keys: AttributeSet<evdev::Key>) -> VirtualDevice{
+fn build_device(all_axis: Vec<UinputAbsSetup>, keys: AttributeSet<evdev::Key>) -> VirtualDevice {
     let builder = VirtualDeviceBuilder::new().unwrap();
-    let mut builder = builder.name("evdev-mapper gamepad")
+    let mut builder = builder
+        .name("evdev-mapper gamepad")
         .with_keys(&keys)
         .unwrap();
 
-    for axis in all_axis{
+    for axis in all_axis {
         builder = builder.with_absolute_axis(&axis).unwrap();
     }
 
     builder.build().unwrap()
 }
 
-pub fn new_device(dev_mappings: &EventMapping) -> VirtualDevice{
+pub fn new_device(dev_mappings: &EventMapping) -> VirtualDevice {
     let output_actions = get_output_actions(dev_mappings);
     let (all_axis, keys) = make_uniput_config(output_actions);
     let mut device = build_device(all_axis, keys);
 
     for path in device.enumerate_dev_nodes_blocking().unwrap() {
-            let path = path.unwrap();
-            println!("Available as {}", path.display());
+        let path = path.unwrap();
+        println!("Available as {}", path.display());
     }
 
     device

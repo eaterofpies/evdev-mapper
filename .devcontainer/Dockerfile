@@ -14,7 +14,7 @@ RUN apt-get update \
     sudo \
     vim
 
-RUN rustup component add clippy
+RUN rustup component add clippy rustfmt
 
 
 
