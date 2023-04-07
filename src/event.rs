@@ -1,9 +1,13 @@
 use serde::Deserialize;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct AbsoluteAxisType(pub evdev::AbsoluteAxisType);
+
+#[derive(Clone, Copy)]
+pub struct AbsInfo(pub evdev::AbsInfo);
 
 impl Deref for AbsoluteAxisType {
     type Target = evdev::AbsoluteAxisType;
@@ -49,5 +53,18 @@ impl Hash for Key {
 impl PartialEq for Key {
     fn eq(&self, other: &Key) -> bool {
         self.0 == other.0
+    }
+}
+
+impl fmt::Debug for AbsInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut debug = f.debug_struct("AbsInfo");
+        debug.field("value", &self.0.value());
+        debug.field("min", &self.0.minimum());
+        debug.field("max", &self.0.maximum());
+        debug.field("fuzz", &self.0.fuzz());
+        debug.field("flat", &self.0.flat());
+        debug.field("resolution", &self.0.resolution());
+        debug.finish()
     }
 }

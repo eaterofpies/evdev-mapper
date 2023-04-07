@@ -1,8 +1,9 @@
 use crate::{
     config::{ConfigMap, ControllerEvent},
-    event::{AbsoluteAxisType, Key},
+    device::get_abs_info,
+    event::{AbsInfo, AbsoluteAxisType, Key},
 };
-use evdev::{AbsInfo, Device};
+use evdev::Device;
 use std::collections::{HashMap, HashSet};
 
 struct DeviceInfo {
@@ -10,36 +11,13 @@ struct DeviceInfo {
     key_info: HashSet<Key>,
 }
 
-fn get_device_info(dev: &Device) -> DeviceInfo {
+fn get_device_info(device: &Device) -> DeviceInfo {
     let mut key_info: HashSet<Key> = HashSet::new();
-    if let Some(key_attrs) = dev.supported_keys() {
+    if let Some(key_attrs) = device.supported_keys() {
         key_info = key_attrs.iter().map(Key).collect();
     }
 
-    let mut axis_info: HashMap<AbsoluteAxisType, AbsInfo> = HashMap::new();
-
-    if let Some(axis_list) = dev.supported_absolute_axes() {
-        if let Ok(abs_infos) = dev.get_abs_state() {
-            let ais = abs_infos.to_vec();
-            axis_info = axis_list
-                .iter()
-                .enumerate()
-                .map(|(i, a)| {
-                    (
-                        AbsoluteAxisType(a),
-                        AbsInfo::new(
-                            ais[i].value,
-                            ais[i].minimum,
-                            ais[i].maximum,
-                            ais[i].fuzz,
-                            ais[i].flat,
-                            ais[i].resolution,
-                        ),
-                    )
-                })
-                .collect();
-        }
-    }
+    let axis_info = get_abs_info(device);
 
     DeviceInfo {
         axis_info,
@@ -64,11 +42,13 @@ fn map_in_abs_axis(
     output: &ControllerEvent,
     dev_info: &DeviceInfo,
 ) -> std::result::Result<OutputEvent, &'static str> {
-    if dev_info.axis_info.contains_key(input) {
+    let this_dev_info = dev_info.axis_info.iter().find(|(k, _v)| *k == input);
+    if let Some((_axis_type, axis_info)) = this_dev_info {
+        println!("Mapping {:?} to {:?} info {:?}", input, output, axis_info);
         match output {
             ControllerEvent::AbsAxis(a) => Ok(OutputEvent::AbsAxis(AbsAxisOutputEvent {
                 axis_type: a.clone(),
-                axis_info: dev_info.axis_info[a],
+                axis_info: *axis_info,
             })),
             ControllerEvent::Key(_) => Err("failed to map absaxis event to key"),
         }

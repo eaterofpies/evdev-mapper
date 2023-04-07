@@ -23,7 +23,7 @@ fn make_uniput_config(
     for event in output_actions {
         match event {
             OutputEvent::AbsAxis(a) => {
-                let abs = UinputAbsSetup::new(a.axis_type.0, a.axis_info);
+                let abs = UinputAbsSetup::new(a.axis_type.0, a.axis_info.0);
                 all_axis.push(abs)
             }
             OutputEvent::Key(a) => keys.insert(a.0),

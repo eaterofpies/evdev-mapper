@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
     let paths: Vec<_> = config.iter().map(|(p, _m)| p.to_owned()).collect();
-    let paths_and_devs = device::open(paths);
+    let paths_and_devs = device::open_devices(paths);
 
     let mappings = make_mapping(&config, &paths_and_devs);
 
