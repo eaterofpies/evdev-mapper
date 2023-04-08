@@ -5,6 +5,7 @@ mod event;
 mod mapping;
 mod uinput;
 
+use args::Mode;
 use clap::Parser;
 use config::{ConfigMap, ControllerEvent};
 use evdev::{Device, EventStream, InputEvent, InputEventKind};
@@ -25,18 +26,22 @@ pub enum NonFatalError {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = args::Args::parse();
-    let mode = args.mode.as_deref().unwrap_or("run");
+    let mode = args.mode.unwrap_or(Mode::Run);
 
-    if mode == "devices" {
-        device::list();
-        Ok(())
-    } else if mode == "properties" {
-        device::properties(args.device.unwrap());
-        Ok(())
-    } else {
-        let config = config::read();
-        run(config).await.unwrap();
-        Ok(())
+    match mode {
+        Mode::Devices => {
+            device::list();
+            Ok(())
+        }
+        Mode::Properties => {
+            device::properties(args.device.unwrap());
+            Ok(())
+        }
+        Mode::Run => {
+            let config = config::read();
+            run(config).await.unwrap();
+            Ok(())
+        }
     }
 }
 
