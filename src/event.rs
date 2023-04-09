@@ -6,9 +6,6 @@ use std::ops::Deref;
 #[derive(Clone, Debug, Deserialize)]
 pub struct AbsoluteAxisType(pub evdev::AbsoluteAxisType);
 
-#[derive(Clone, Copy)]
-pub struct AbsInfo(pub evdev::AbsInfo);
-
 impl Deref for AbsoluteAxisType {
     type Target = evdev::AbsoluteAxisType;
 
@@ -56,6 +53,10 @@ impl PartialEq for Key {
     }
 }
 
+
+#[derive(Clone, Copy)]
+pub struct AbsInfo(pub evdev::AbsInfo);
+
 impl fmt::Debug for AbsInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut debug = f.debug_struct("AbsInfo");
@@ -66,5 +67,20 @@ impl fmt::Debug for AbsInfo {
         debug.field("flat", &self.0.flat());
         debug.field("resolution", &self.0.resolution());
         debug.finish()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq)]
+pub struct Synchronization(pub evdev::Synchronization);
+
+impl Hash for Synchronization {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.0.hash(state)
+    }
+}
+
+impl PartialEq for Synchronization {
+    fn eq(&self, other: &Synchronization) -> bool {
+        self.0 == other.0
     }
 }

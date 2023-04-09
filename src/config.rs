@@ -1,4 +1,4 @@
-use crate::event::{AbsoluteAxisType, Key};
+use crate::event::{AbsoluteAxisType, Key, Synchronization};
 use serde::Deserialize;
 use std::{collections::HashMap, fs::File};
 
@@ -24,6 +24,7 @@ struct EventMapping {
 pub enum ControllerEvent {
     AbsAxis(AbsoluteAxisType),
     Key(Key),
+    Synchronization(Synchronization),
 }
 
 pub type ConfigMap = HashMap<String, HashMap<ControllerEvent, ControllerEvent>>;

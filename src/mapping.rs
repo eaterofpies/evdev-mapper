@@ -1,7 +1,7 @@
 use crate::{
     config::{ConfigMap, ControllerEvent},
     device::get_abs_info,
-    event::{AbsInfo, AbsoluteAxisType, Key},
+    event::{AbsInfo, AbsoluteAxisType, Key, Synchronization},
 };
 use evdev::Device;
 use std::collections::{HashMap, HashSet};
@@ -35,6 +35,7 @@ pub struct AbsAxisOutputEvent {
 pub enum OutputEvent {
     AbsAxis(AbsAxisOutputEvent),
     Key(Key),
+    Synchronization(Synchronization)
 }
 
 fn map_in_abs_axis(
@@ -51,6 +52,8 @@ fn map_in_abs_axis(
                 axis_info: *axis_info,
             })),
             ControllerEvent::Key(_) => Err("failed to map absaxis event to key"),
+            ControllerEvent::Synchronization(_) => Err("failed to map absaxis event to synchronization"),
+
         }
     } else {
         Err("Requested input axis not present on device")
@@ -66,6 +69,7 @@ fn map_in_key(
         match output {
             ControllerEvent::AbsAxis(_) => Err("failed to map key event to absaxis"),
             ControllerEvent::Key(k) => Ok(OutputEvent::Key(k.clone())),
+            ControllerEvent::Synchronization(_) => Err("failed to map key event to synchronization"),
         }
     } else {
         Err("Requested input key not present on device")
@@ -80,6 +84,7 @@ fn make_output_mapping(
     match input {
         ControllerEvent::AbsAxis(a) => map_in_abs_axis(a, output, dev_info),
         ControllerEvent::Key(k) => map_in_key(k, output, dev_info),
+        ControllerEvent::Synchronization(a) => Ok(OutputEvent::Synchronization(a.clone()))
     }
 }
 

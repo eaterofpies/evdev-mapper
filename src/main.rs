@@ -9,7 +9,7 @@ use args::Mode;
 use clap::Parser;
 use config::{ConfigMap, ControllerEvent};
 use evdev::{Device, EventStream, InputEvent, InputEventKind};
-use event::{AbsoluteAxisType, Key};
+use event::{AbsoluteAxisType, Key, Synchronization};
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::HashMap;
 use std::error::Error;
@@ -87,6 +87,11 @@ async fn combine_devices(
                 k.code(),
                 path_and_event.1.value(),
             )),
+            Some(OutputEvent::Synchronization(_a)) => Ok(InputEvent::new(
+                evdev::EventType::SYNCHRONIZATION, 
+                path_and_event.1.code(), 
+                path_and_event.1.value()
+            )),
             None => Err(NonFatalError::Str(format!(
                 "No handler for event type {:?}",
                 path_and_event.1
@@ -124,6 +129,7 @@ fn interpret_event(
     let maybe_input_event = match event.kind() {
         InputEventKind::AbsAxis(a) => Option::from(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
         InputEventKind::Key(a) => Option::from(ControllerEvent::Key(Key(a))),
+        InputEventKind::Synchronization(a) => Option::from(ControllerEvent::Synchronization(Synchronization(a))), 
         _ => None,
     };
 

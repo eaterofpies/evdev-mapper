@@ -27,6 +27,7 @@ fn make_uniput_config(
                 all_axis.push(abs)
             }
             OutputEvent::Key(a) => keys.insert(a.0),
+            OutputEvent::Synchronization(_) => (),
         }
     }
 
