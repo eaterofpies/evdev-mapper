@@ -11,11 +11,15 @@ pub enum Mode {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// mode to start in. Default is run.
-    #[arg(short, long)]
-    pub mode: Option<Mode>,
+    /// Program mode mode to start in.
+    #[arg(short, long, default_value = "run")]
+    pub mode: Mode,
 
     /// Device (required in properties mode)
     #[arg(short, long)]
     pub device: Option<String>,
+
+    /// Config file to run with
+    #[arg(short, long, default_value = "device.conf")]
+    pub config: String,
 }

@@ -26,7 +26,8 @@ pub enum NonFatalError {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = args::Args::parse();
-    let mode = args.mode.unwrap_or(Mode::Run);
+    let mode = args.mode;
+    let config_path = args.config;
 
     match mode {
         Mode::Devices => {
@@ -34,12 +35,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(())
         }
         Mode::Properties => {
-            device::properties(args.device.unwrap());
+            match args.device {
+                Some(device_path) => device::properties(device_path)?,
+                None => println!("Device must be set in 'properties' mode."),
+            }
             Ok(())
         }
         Mode::Run => {
-            let config = config::read();
-            run(config).await.unwrap();
+            let config = config::read(&config_path);
+            match config {
+                Ok(c) => {
+                    run(c).await?;
+                }
+                Err(e) => {
+                    println!("Failed to read config file '{:}'. {:}.", config_path, e);
+                }
+            };
+
             Ok(())
         }
     }
@@ -47,7 +59,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
     let paths: Vec<_> = config.iter().map(|(p, _m)| p.to_owned()).collect();
-    let paths_and_devs = device::open_devices(paths);
+    let paths_and_devs = device::open_devices(paths)?;
 
     let mappings = make_mapping(&config, &paths_and_devs);
 
@@ -64,7 +76,7 @@ async fn combine_devices(
         .map(|(p, d)| (p, d.into_event_stream().unwrap()))
         .collect();
 
-    let mut output_device = new_device(&mappings);
+    let mut output_device = new_device(&mappings)?;
 
     loop {
         // Setup futures for the event sources
@@ -73,20 +85,21 @@ async fn combine_devices(
         );
 
         // wait for an event
-        let (path, event) = futures.next().await.unwrap();
-        let result = interpret_event(&path, &event, &mappings);
+        if let Some((path, event)) = futures.next().await {
+            let result = interpret_event(&path, &event, &mappings);
 
-        let result = match result {
-            Ok(ev) => {
-                println!("writing event {:?}", ev);
-                output_device.emit(&[ev]).map_err(NonFatalError::Io)
+            let result = match result {
+                Ok(ev) => {
+                    println!("writing event {:?}", ev);
+                    output_device.emit(&[ev]).map_err(NonFatalError::Io)
+                }
+                Err(err) => Err(err),
+            };
+
+            match result {
+                Ok(_) => (),
+                Err(e) => println!("{:?}", e),
             }
-            Err(err) => Err(err),
-        };
-
-        match result {
-            Ok(_) => (),
-            Err(e) => println!("{:?}", e),
         }
     }
 }

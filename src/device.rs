@@ -1,5 +1,5 @@
 use evdev::Device;
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Error};
 
 use crate::event::{AbsInfo, AbsoluteAxisType};
 
@@ -28,7 +28,7 @@ pub fn list() {
     }
 }
 
-fn print_properties(device: &Device) {
+fn print_properties(device: &Device) -> Result<(), Error> {
     println!("Device: {}", device.name().unwrap_or("unknown"));
 
     if let Some(all_axis) = device.supported_keys() {
@@ -38,23 +38,28 @@ fn print_properties(device: &Device) {
         }
     }
 
-    let abs_info = get_abs_info(device);
+    let abs_info = get_abs_info(device)?;
 
     println!("Absolute axis:");
     for (k, v) in abs_info.iter() {
         println!("\t{:?}: {:?}", k, v)
     }
+
+    Ok(())
 }
 
-fn open_device(path: &String) -> Device {
-    let mut device = Device::open(path).unwrap();
-    device.grab().unwrap();
-    print_properties(&device);
-    device
+fn open_device(path: &String) -> Result<Device, Error> {
+    let mut device = Device::open(path)?;
+
+    // Grab the device to stop duplicate events from multiple devices
+    device.grab()?;
+
+    print_properties(&device)?;
+    Ok(device)
 }
 
-pub fn get_abs_info(device: &Device) -> HashMap<AbsoluteAxisType, AbsInfo> {
-    let axis_states = device.get_abs_state().unwrap().to_vec();
+pub fn get_abs_info(device: &Device) -> Result<HashMap<AbsoluteAxisType, AbsInfo>, Error> {
+    let axis_states = device.get_abs_state()?.to_vec();
 
     let mut abs_info: HashMap<AbsoluteAxisType, AbsInfo> = HashMap::new();
 
@@ -78,17 +83,22 @@ pub fn get_abs_info(device: &Device) -> HashMap<AbsoluteAxisType, AbsInfo> {
             .collect();
     }
 
-    abs_info
+    Ok(abs_info)
 }
 
-pub fn properties(path: String) {
-    let device = Device::open(path).unwrap();
-    print_properties(&device);
+pub fn properties(path: String) -> Result<(), Error> {
+    let device = Device::open(path)?;
+    print_properties(&device)?;
+    Ok(())
 }
 
-pub fn open_devices(paths: Vec<String>) -> HashMap<String, Device> {
-    paths
-        .iter()
-        .map(|path| (path.to_owned(), open_device(path)))
-        .collect()
+pub fn open_devices(paths: Vec<String>) -> Result<HashMap<String, Device>, Error> {
+    let mut devices: HashMap<String, Device> = HashMap::new();
+
+    for path in paths {
+        let device = open_device(&path)?;
+        devices.insert(path.clone(), device);
+    }
+
+    Ok(devices)
 }

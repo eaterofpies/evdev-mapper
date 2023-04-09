@@ -1,6 +1,6 @@
 use crate::event::{AbsoluteAxisType, Key, Synchronization};
 use serde::Deserialize;
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, fs::File, io::Error};
 
 #[derive(Debug, Deserialize)]
 struct Config {
@@ -28,8 +28,9 @@ pub enum ControllerEvent {
 }
 
 pub type ConfigMap = HashMap<String, HashMap<ControllerEvent, ControllerEvent>>;
-pub fn read() -> ConfigMap {
-    let file = File::open("device.conf").unwrap();
+pub fn read(path: &String) -> Result<ConfigMap, Error> {
+    let file = File::open(path)?;
+
     let config: Config = serde_yaml::from_reader(file).expect("Could not read values.");
 
     let config_map: HashMap<_, _> = config
@@ -38,7 +39,7 @@ pub fn read() -> ConfigMap {
         .map(|d| (d.path, mappings_to_map(d.mappings)))
         .collect();
     println!("{:?}", config_map);
-    config_map
+    Ok(config_map)
 }
 
 fn mappings_to_map(mappings: Vec<EventMapping>) -> HashMap<ControllerEvent, ControllerEvent> {

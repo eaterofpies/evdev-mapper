@@ -4,25 +4,28 @@ use crate::{
     event::{AbsInfo, AbsoluteAxisType, Key, Synchronization},
 };
 use evdev::Device;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+};
 
 struct DeviceInfo {
     axis_info: HashMap<AbsoluteAxisType, AbsInfo>,
     key_info: HashSet<Key>,
 }
 
-fn get_device_info(device: &Device) -> DeviceInfo {
+fn get_device_info(device: &Device) -> Result<DeviceInfo, Error> {
     let mut key_info: HashSet<Key> = HashSet::new();
     if let Some(key_attrs) = device.supported_keys() {
         key_info = key_attrs.iter().map(Key).collect();
     }
 
-    let axis_info = get_abs_info(device);
+    let axis_info = get_abs_info(device)?;
 
-    DeviceInfo {
+    Ok(DeviceInfo {
         axis_info,
         key_info,
-    }
+    })
 }
 
 #[derive(Clone)]
@@ -35,7 +38,7 @@ pub struct AbsAxisOutputEvent {
 pub enum OutputEvent {
     AbsAxis(AbsAxisOutputEvent),
     Key(Key),
-    Synchronization(Synchronization)
+    Synchronization(Synchronization),
 }
 
 fn map_in_abs_axis(
@@ -52,8 +55,9 @@ fn map_in_abs_axis(
                 axis_info: *axis_info,
             })),
             ControllerEvent::Key(_) => Err("failed to map absaxis event to key"),
-            ControllerEvent::Synchronization(_) => Err("failed to map absaxis event to synchronization"),
-
+            ControllerEvent::Synchronization(_) => {
+                Err("failed to map absaxis event to synchronization")
+            }
         }
     } else {
         Err("Requested input axis not present on device")
@@ -69,7 +73,9 @@ fn map_in_key(
         match output {
             ControllerEvent::AbsAxis(_) => Err("failed to map key event to absaxis"),
             ControllerEvent::Key(k) => Ok(OutputEvent::Key(k.clone())),
-            ControllerEvent::Synchronization(_) => Err("failed to map key event to synchronization"),
+            ControllerEvent::Synchronization(_) => {
+                Err("failed to map key event to synchronization")
+            }
         }
     } else {
         Err("Requested input key not present on device")
@@ -84,7 +90,7 @@ fn make_output_mapping(
     match input {
         ControllerEvent::AbsAxis(a) => map_in_abs_axis(a, output, dev_info),
         ControllerEvent::Key(k) => map_in_key(k, output, dev_info),
-        ControllerEvent::Synchronization(a) => Ok(OutputEvent::Synchronization(a.clone()))
+        ControllerEvent::Synchronization(a) => Ok(OutputEvent::Synchronization(a.clone())),
     }
 }
 
@@ -102,7 +108,7 @@ pub type EventMapping = HashMap<String, HashMap<ControllerEvent, OutputEvent>>;
 pub fn make_mapping(config: &ConfigMap, paths_and_devs: &HashMap<String, Device>) -> EventMapping {
     let path_and_info: HashMap<_, _> = paths_and_devs
         .iter()
-        .map(|(p, d)| (p, get_device_info(d)))
+        .map(|(p, d)| (p, get_device_info(d).unwrap()))
         .collect();
 
     config

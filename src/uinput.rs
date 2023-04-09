@@ -1,6 +1,7 @@
 use crate::mapping::{EventMapping, OutputEvent};
 use evdev::uinput::{VirtualDevice, VirtualDeviceBuilder};
 use evdev::{AttributeSet, UinputAbsSetup};
+use std::io::Error;
 
 // Get a list of all of the possible outputs for the new device
 fn get_output_actions(dev_mappings: &EventMapping) -> Vec<&OutputEvent> {
@@ -34,29 +35,29 @@ fn make_uniput_config(
     (all_axis, keys)
 }
 
-fn build_device(all_axis: Vec<UinputAbsSetup>, keys: AttributeSet<evdev::Key>) -> VirtualDevice {
-    let builder = VirtualDeviceBuilder::new().unwrap();
-    let mut builder = builder
-        .name("evdev-mapper gamepad")
-        .with_keys(&keys)
-        .unwrap();
+fn build_device(
+    all_axis: Vec<UinputAbsSetup>,
+    keys: AttributeSet<evdev::Key>,
+) -> Result<VirtualDevice, Error> {
+    let builder = VirtualDeviceBuilder::new()?;
+    let mut builder = builder.name("evdev-mapper gamepad").with_keys(&keys)?;
 
     for axis in all_axis {
-        builder = builder.with_absolute_axis(&axis).unwrap();
+        builder = builder.with_absolute_axis(&axis)?;
     }
 
-    builder.build().unwrap()
+    builder.build()
 }
 
-pub fn new_device(dev_mappings: &EventMapping) -> VirtualDevice {
+pub fn new_device(dev_mappings: &EventMapping) -> Result<VirtualDevice, Error> {
     let output_actions = get_output_actions(dev_mappings);
     let (all_axis, keys) = make_uniput_config(output_actions);
-    let mut device = build_device(all_axis, keys);
+    let mut device = build_device(all_axis, keys)?;
 
-    for path in device.enumerate_dev_nodes_blocking().unwrap() {
-        let path = path.unwrap();
+    for path in device.enumerate_dev_nodes_blocking()? {
+        let path = path?;
         println!("Available as {}", path.display());
     }
 
-    device
+    Ok(device)
 }
