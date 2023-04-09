@@ -73,45 +73,20 @@ async fn combine_devices(
         );
 
         // wait for an event
-        let path_and_event = futures.next().await.unwrap();
-        let output_event = interpret_event(&path_and_event.0, &path_and_event.1, &mappings);
+        let (path, event) = futures.next().await.unwrap();
+        let result = interpret_event(&path, &event, &mappings);
 
-        let message = match output_event {
-            Some(OutputEvent::AbsAxis(a)) => Ok(InputEvent::new(
-                evdev::EventType::ABSOLUTE,
-                a.axis_type.0 .0,
-                path_and_event.1.value(),
-            )),
-            Some(OutputEvent::Key(k)) => Ok(InputEvent::new(
-                evdev::EventType::KEY,
-                k.code(),
-                path_and_event.1.value(),
-            )),
-            Some(OutputEvent::Synchronization(_a)) => Ok(InputEvent::new(
-                evdev::EventType::SYNCHRONIZATION, 
-                path_and_event.1.code(), 
-                path_and_event.1.value()
-            )),
-            None => Err(NonFatalError::Str(format!(
-                "No handler for event type {:?}",
-                path_and_event.1
-            ))),
-        };
-
-        let result = match message {
+        let result = match result {
             Ok(ev) => {
                 println!("writing event {:?}", ev);
-                let res = output_device.emit(&[ev]);
-                match res {
-                    Ok(a) => Ok(a),
-                    Err(err) => Err(NonFatalError::Io(err)),
-                }
+                output_device.emit(&[ev]).map_err(NonFatalError::Io)
             }
             Err(err) => Err(err),
         };
 
-        if let Err(e) = result {
-            println!("{:?}", e);
+        match result {
+            Ok(_) => (),
+            Err(e) => println!("{:?}", e),
         }
     }
 }
@@ -124,23 +99,42 @@ fn interpret_event(
     path: &String,
     event: &InputEvent,
     event_mappings: &EventMapping,
-) -> Option<OutputEvent> {
+) -> std::result::Result<evdev::InputEvent, NonFatalError> {
     // Make a ControllerEvent from the input
     let maybe_input_event = match event.kind() {
-        InputEventKind::AbsAxis(a) => Option::from(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
-        InputEventKind::Key(a) => Option::from(ControllerEvent::Key(Key(a))),
-        InputEventKind::Synchronization(a) => Option::from(ControllerEvent::Synchronization(Synchronization(a))), 
+        InputEventKind::AbsAxis(a) => Some(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
+        InputEventKind::Key(a) => Some(ControllerEvent::Key(Key(a))),
+        InputEventKind::Synchronization(a) => {
+            Some(ControllerEvent::Synchronization(Synchronization(a)))
+        }
         _ => None,
     };
 
+    //    maybe_input_event.and_then(|e| )
     // Interpret the event
-    if let Some(input_event) = maybe_input_event {
-        if let Some(event_mapping) = event_mappings.get(path) {
-            if let Some(output_event) = event_mapping.get(&input_event) {
-                return Some(output_event.clone());
-            }
-        }
-    }
+    //    if let Some(input_event) = maybe_input_event {
+    let output_event = maybe_input_event
+        .and_then(|input_event| event_mappings.get(path).and_then(|m| m.get(&input_event)));
 
-    None
+    match output_event {
+        Some(OutputEvent::AbsAxis(a)) => Ok(InputEvent::new(
+            evdev::EventType::ABSOLUTE,
+            a.axis_type.0 .0,
+            event.value(),
+        )),
+        Some(OutputEvent::Key(k)) => Ok(InputEvent::new(
+            evdev::EventType::KEY,
+            k.code(),
+            event.value(),
+        )),
+        Some(OutputEvent::Synchronization(_a)) => Ok(InputEvent::new(
+            evdev::EventType::SYNCHRONIZATION,
+            event.code(),
+            event.value(),
+        )),
+        None => Err(NonFatalError::Str(format!(
+            "No handler for event type {:?}",
+            event
+        ))),
+    }
 }
