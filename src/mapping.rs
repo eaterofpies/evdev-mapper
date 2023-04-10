@@ -1,9 +1,8 @@
 use crate::{
     config::{ConfigMap, ControllerEvent},
-    device::get_abs_info,
-    event::{AbsInfo, AbsoluteAxisType, Key, Synchronization},
+    ew_device::Device,
+    ew_types::{AbsInfo, AbsoluteAxisType, Key, Synchronization},
 };
-use evdev::Device;
 use std::{
     collections::{HashMap, HashSet},
     io::Error,
@@ -15,12 +14,9 @@ struct DeviceInfo {
 }
 
 fn get_device_info(device: &Device) -> Result<DeviceInfo, Error> {
-    let mut key_info: HashSet<Key> = HashSet::new();
-    if let Some(key_attrs) = device.supported_keys() {
-        key_info = key_attrs.iter().map(Key).collect();
-    }
+    let key_info: HashSet<Key> = device.supported_keys();
 
-    let axis_info = get_abs_info(device)?;
+    let axis_info = device.get_abs_state()?;
 
     Ok(DeviceInfo {
         axis_info,

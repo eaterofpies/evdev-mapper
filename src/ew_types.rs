@@ -53,7 +53,6 @@ impl PartialEq for Key {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub struct AbsInfo(pub evdev::AbsInfo);
 
@@ -75,7 +74,7 @@ pub struct Synchronization(pub evdev::Synchronization);
 
 impl Hash for Synchronization {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.0.hash(state)
+        self.0 .0.hash(state)
     }
 }
 

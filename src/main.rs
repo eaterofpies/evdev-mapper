@@ -1,15 +1,17 @@
 mod args;
 mod config;
 mod device;
-mod event;
+mod ew_device;
+mod ew_types;
 mod mapping;
 mod uinput;
 
 use args::Mode;
 use clap::Parser;
 use config::{ConfigMap, ControllerEvent};
-use evdev::{Device, EventStream, InputEvent, InputEventKind};
-use event::{AbsoluteAxisType, Key, Synchronization};
+use evdev::{EventStream, InputEvent, InputEventKind};
+use ew_device::Device;
+use ew_types::{AbsoluteAxisType, Key, Synchronization};
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::HashMap;
 use std::error::Error;

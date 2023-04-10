@@ -1,4 +1,4 @@
-use crate::event::{AbsoluteAxisType, Key, Synchronization};
+use crate::ew_types::{AbsoluteAxisType, Key, Synchronization};
 use serde::Deserialize;
 use std::{collections::HashMap, fs::File, io::Error};
 
