@@ -1,7 +1,7 @@
 use crate::{
     config::{ConfigMap, ControllerEvent},
     ew_device::Device,
-    ew_types::{AbsInfo, AbsoluteAxisType, Key, Synchronization},
+    ew_types::{AbsInfo, AbsoluteAxisType, KeyCode},
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -10,11 +10,11 @@ use std::{
 
 struct DeviceInfo {
     axis_info: HashMap<AbsoluteAxisType, AbsInfo>,
-    key_info: HashSet<Key>,
+    key_info: HashSet<KeyCode>,
 }
 
 fn get_device_info(device: &Device) -> Result<DeviceInfo, Error> {
-    let key_info: HashSet<Key> = device.supported_keys();
+    let key_info: HashSet<KeyCode> = device.supported_keys();
 
     let axis_info = device.get_abs_state()?;
 
@@ -24,17 +24,82 @@ fn get_device_info(device: &Device) -> Result<DeviceInfo, Error> {
     })
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AbsAxisOutputEvent {
     pub axis_type: AbsoluteAxisType,
     pub axis_info: AbsInfo,
 }
 
-#[derive(Clone)]
+impl AbsAxisOutputEvent {
+    pub fn clone_set_value(&self, value: i32) -> Self {
+        AbsAxisOutputEvent {
+            axis_type: self.axis_type.clone(),
+            axis_info: self.axis_info.clone_set_value(value),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct KeyOutputEvent {
+    code: KeyCode,
+    value: i32,
+}
+
+impl KeyOutputEvent {
+    pub fn new(code: KeyCode, value: i32) -> Self {
+        KeyOutputEvent { code, value }
+    }
+
+    pub fn code(&self) -> KeyCode {
+        self.code.clone()
+    }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SyncOutputEvent {
+    code: u16,
+    value: i32,
+}
+
+impl SyncOutputEvent {
+    pub fn new() -> Self {
+        Self { code: 0, value: 0 }
+    }
+
+    pub fn clone_set_value(&self, value: i32) -> Self {
+        Self { code: 0, value }
+    }
+
+    pub fn code(&self) -> u16 {
+        self.code
+    }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum OutputEvent {
     AbsAxis(AbsAxisOutputEvent),
-    Key(Key),
-    Synchronization(Synchronization),
+    Key(KeyOutputEvent),
+    Synchronization(SyncOutputEvent),
+}
+
+impl OutputEvent {
+    pub fn clone_set_value(&self, value: i32) -> Self {
+        match self {
+            OutputEvent::AbsAxis(a) => OutputEvent::AbsAxis(a.clone_set_value(value)),
+            OutputEvent::Key(k) => OutputEvent::Key(KeyOutputEvent::new(k.code(), value)),
+            OutputEvent::Synchronization(s) => {
+                OutputEvent::Synchronization(s.clone_set_value(value))
+            }
+        }
+    }
 }
 
 fn map_in_abs_axis(
@@ -61,14 +126,14 @@ fn map_in_abs_axis(
 }
 
 fn map_in_key(
-    input: &Key,
+    input: &KeyCode,
     output: &ControllerEvent,
     dev_info: &DeviceInfo,
 ) -> std::result::Result<OutputEvent, &'static str> {
     if dev_info.key_info.contains(input) {
         match output {
             ControllerEvent::AbsAxis(_) => Err("failed to map key event to absaxis"),
-            ControllerEvent::Key(k) => Ok(OutputEvent::Key(k.clone())),
+            ControllerEvent::Key(k) => Ok(OutputEvent::Key(KeyOutputEvent::new(k.clone(), 0))),
             ControllerEvent::Synchronization(_) => {
                 Err("failed to map key event to synchronization")
             }
@@ -86,7 +151,9 @@ fn make_output_mapping(
     match input {
         ControllerEvent::AbsAxis(a) => map_in_abs_axis(a, output, dev_info),
         ControllerEvent::Key(k) => map_in_key(k, output, dev_info),
-        ControllerEvent::Synchronization(a) => Ok(OutputEvent::Synchronization(a.clone())),
+        ControllerEvent::Synchronization(_a) => {
+            Ok(OutputEvent::Synchronization(SyncOutputEvent::new()))
+        }
     }
 }
 

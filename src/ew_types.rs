@@ -29,9 +29,9 @@ impl PartialEq for AbsoluteAxisType {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct Key(pub evdev::Key);
+pub struct KeyCode(pub evdev::Key);
 
-impl Deref for Key {
+impl Deref for KeyCode {
     type Target = evdev::Key;
 
     fn deref(&self) -> &Self::Target {
@@ -39,22 +39,35 @@ impl Deref for Key {
     }
 }
 
-impl Eq for Key {}
+impl Eq for KeyCode {}
 
-impl Hash for Key {
+impl Hash for KeyCode {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state)
     }
 }
 
-impl PartialEq for Key {
-    fn eq(&self, other: &Key) -> bool {
+impl PartialEq for KeyCode {
+    fn eq(&self, other: &KeyCode) -> bool {
         self.0 == other.0
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct AbsInfo(pub evdev::AbsInfo);
+
+impl AbsInfo {
+    pub fn clone_set_value(&self, value: i32) -> Self {
+        AbsInfo(evdev::AbsInfo::new(
+            value,
+            self.0.minimum(),
+            self.0.maximum(),
+            self.0.fuzz(),
+            self.0.flat(),
+            self.0.resolution(),
+        ))
+    }
+}
 
 impl fmt::Debug for AbsInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -81,5 +94,22 @@ impl Hash for Synchronization {
 impl PartialEq for Synchronization {
     fn eq(&self, other: &Synchronization) -> bool {
         self.0 == other.0
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct InputEvent(pub evdev::InputEvent);
+impl InputEvent {
+    pub fn kind(&self) -> evdev::InputEventKind {
+        self.0.kind()
+    }
+}
+
+pub struct EventStream(pub evdev::EventStream);
+
+impl EventStream {
+    pub async fn next_event(&mut self) -> Result<InputEvent, std::io::Error> {
+        let result = self.0.next_event().await?;
+        Ok(InputEvent(result))
     }
 }

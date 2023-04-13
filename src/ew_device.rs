@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use crate::ew_types::{AbsInfo, AbsoluteAxisType, Key};
+use crate::ew_types::{AbsInfo, AbsoluteAxisType, EventStream, KeyCode};
 
 pub struct Device(evdev::Device);
 
@@ -46,10 +46,10 @@ impl Device {
         self.0.name()
     }
 
-    pub fn supported_keys(&self) -> HashSet<Key> {
-        let mut key_info: HashSet<Key> = HashSet::new();
+    pub fn supported_keys(&self) -> HashSet<KeyCode> {
+        let mut key_info: HashSet<KeyCode> = HashSet::new();
         if let Some(key_attrs) = self.0.supported_keys() {
-            key_info = key_attrs.iter().map(Key).collect();
+            key_info = key_attrs.iter().map(KeyCode).collect();
         }
 
         key_info
@@ -59,7 +59,8 @@ impl Device {
         self.0.grab()
     }
 
-    pub fn into_event_stream(self) -> Result<evdev::EventStream, Error> {
-        self.0.into_event_stream()
+    pub fn into_event_stream(self) -> Result<EventStream, Error> {
+        let raw = self.0.into_event_stream()?;
+        Ok(EventStream(raw))
     }
 }

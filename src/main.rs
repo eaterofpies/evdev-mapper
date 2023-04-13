@@ -3,15 +3,16 @@ mod config;
 mod device;
 mod ew_device;
 mod ew_types;
+mod ew_uinput;
 mod mapping;
 mod uinput;
 
 use args::Mode;
 use clap::Parser;
 use config::{ConfigMap, ControllerEvent};
-use evdev::{EventStream, InputEvent, InputEventKind};
+use evdev::InputEventKind;
 use ew_device::Device;
-use ew_types::{AbsoluteAxisType, Key, Synchronization};
+use ew_types::{AbsoluteAxisType, EventStream, InputEvent, KeyCode, Synchronization};
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::HashMap;
 use std::error::Error;
@@ -114,11 +115,11 @@ fn interpret_event(
     path: &String,
     event: &InputEvent,
     event_mappings: &EventMapping,
-) -> std::result::Result<evdev::InputEvent, NonFatalError> {
+) -> std::result::Result<OutputEvent, NonFatalError> {
     // Make a ControllerEvent from the input
     let maybe_input_event = match event.kind() {
         InputEventKind::AbsAxis(a) => Some(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
-        InputEventKind::Key(a) => Some(ControllerEvent::Key(Key(a))),
+        InputEventKind::Key(a) => Some(ControllerEvent::Key(KeyCode(a))),
         InputEventKind::Synchronization(a) => {
             Some(ControllerEvent::Synchronization(Synchronization(a)))
         }
@@ -132,21 +133,7 @@ fn interpret_event(
         .and_then(|input_event| event_mappings.get(path).and_then(|m| m.get(&input_event)));
 
     match output_event {
-        Some(OutputEvent::AbsAxis(a)) => Ok(InputEvent::new(
-            evdev::EventType::ABSOLUTE,
-            a.axis_type.0 .0,
-            event.value(),
-        )),
-        Some(OutputEvent::Key(k)) => Ok(InputEvent::new(
-            evdev::EventType::KEY,
-            k.code(),
-            event.value(),
-        )),
-        Some(OutputEvent::Synchronization(_a)) => Ok(InputEvent::new(
-            evdev::EventType::SYNCHRONIZATION,
-            event.code(),
-            event.value(),
-        )),
+        Some(oe) => Ok(oe.clone_set_value(event.0.value())),
         None => Err(NonFatalError::Str(format!(
             "No handler for event type {:?}",
             event
