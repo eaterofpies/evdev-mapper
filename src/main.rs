@@ -117,25 +117,25 @@ fn interpret_event(
     event_mappings: &EventMapping,
 ) -> std::result::Result<OutputEvent, NonFatalError> {
     // Make a ControllerEvent from the input
-    let maybe_input_event = match event.kind() {
-        InputEventKind::AbsAxis(a) => Some(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
-        InputEventKind::Key(a) => Some(ControllerEvent::Key(KeyCode(a))),
+    let input_event = match event.kind() {
+        InputEventKind::AbsAxis(a) => Ok(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
+        InputEventKind::Key(a) => Ok(ControllerEvent::Key(KeyCode(a))),
         InputEventKind::Synchronization(a) => {
-            Some(ControllerEvent::Synchronization(Synchronization(a)))
+            Ok(ControllerEvent::Synchronization(Synchronization(a)))
         }
-        _ => None,
-    };
+        _ => Err(NonFatalError::Str(format!(
+            "No handler for event type {:?}",
+            event
+        ))),
+    }?;
 
-    //    maybe_input_event.and_then(|e| )
-    // Interpret the event
-    //    if let Some(input_event) = maybe_input_event {
-    let output_event = maybe_input_event
-        .and_then(|input_event| event_mappings.get(path).and_then(|m| m.get(&input_event)));
+    // Ignore sync events for now as the mapping isn't set up.
+    let output_event = event_mappings.get(path).and_then(|m| m.get(&input_event));
 
     match output_event {
         Some(oe) => Ok(oe.clone_set_value(event.0.value())),
         None => Err(NonFatalError::Str(format!(
-            "No handler for event type {:?}",
+            "No mapping for event type {:?}",
             event
         ))),
     }

@@ -1,7 +1,7 @@
 use crate::{
     config::{ConfigMap, ControllerEvent},
     ew_device::Device,
-    ew_types::{AbsInfo, AbsoluteAxisType, KeyCode},
+    ew_types::{AbsInfo, AbsoluteAxisType, KeyCode, Synchronization},
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -161,8 +161,14 @@ fn make_dev_mapping(
     io_mapping: &HashMap<ControllerEvent, ControllerEvent>,
     axis_info: &DeviceInfo,
 ) -> HashMap<ControllerEvent, OutputEvent> {
-    io_mapping
-        .iter()
+    let sync_mapping = HashMap::from([(
+        ControllerEvent::Synchronization(Synchronization(evdev::Synchronization::SYN_REPORT)),
+        ControllerEvent::Synchronization(Synchronization(evdev::Synchronization::SYN_REPORT)),
+    )]);
+
+    let all_mapping = sync_mapping.iter().chain(io_mapping.iter());
+
+    all_mapping
         .map(|(i, o)| (i.clone(), make_output_mapping(i, o, axis_info).unwrap()))
         .collect()
 }
