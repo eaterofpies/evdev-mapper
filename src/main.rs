@@ -14,6 +14,7 @@ use evdev::InputEventKind;
 use ew_device::Device;
 use ew_types::{AbsoluteAxisType, EventStream, InputEvent, KeyCode, Synchronization};
 use futures::stream::{FuturesUnordered, StreamExt};
+use log::{debug, error, warn};
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -28,6 +29,8 @@ pub enum NonFatalError {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let args = args::Args::parse();
     let mode = args.mode;
     let config_path = args.config;
@@ -40,7 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Mode::Properties => {
             match args.device {
                 Some(device_path) => device::properties(device_path)?,
-                None => println!("Device must be set in 'properties' mode."),
+                None => log::error!("Device must be set in 'properties' mode."),
             }
             Ok(())
         }
@@ -51,7 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     run(c).await?;
                 }
                 Err(e) => {
-                    println!("Failed to read config file '{:}'. {:}.", config_path, e);
+                    error!("Failed to read config file '{:}'. {:}.", config_path, e);
                 }
             };
 
@@ -93,7 +96,7 @@ async fn combine_devices(
 
             let result = match result {
                 Ok(ev) => {
-                    println!("writing event {:?}", ev);
+                    debug!("writing event {:?}", ev);
                     output_device.emit(&[ev]).map_err(NonFatalError::Io)
                 }
                 Err(err) => Err(err),
@@ -101,7 +104,7 @@ async fn combine_devices(
 
             match result {
                 Ok(_) => (),
-                Err(e) => println!("{:?}", e),
+                Err(e) => warn!("{:?}", e),
             }
         }
     }

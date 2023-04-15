@@ -1,3 +1,5 @@
+use log::debug;
+
 use crate::{
     config::{ConfigMap, ControllerEvent},
     ew_device::Device,
@@ -109,7 +111,7 @@ fn map_in_abs_axis(
 ) -> std::result::Result<OutputEvent, &'static str> {
     let this_dev_info = dev_info.axis_info.iter().find(|(k, _v)| *k == input);
     if let Some((_axis_type, axis_info)) = this_dev_info {
-        println!("Mapping {:?} to {:?} info {:?}", input, output, axis_info);
+        debug!("Mapping {:?} to {:?} info {:?}", input, output, axis_info);
         match output {
             ControllerEvent::AbsAxis(a) => Ok(OutputEvent::AbsAxis(AbsAxisOutputEvent {
                 axis_type: a.clone(),
