@@ -10,6 +10,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     bash \
     git \
+    less \
     ssh \
     sudo \
     vim
