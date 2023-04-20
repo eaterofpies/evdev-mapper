@@ -201,9 +201,9 @@ fn map_in_abs_axis(
                 axis_info: *axis_info,
             })),
             ControllerOutputEvent::Key(_) => {
-                Err(FatalError::Str("failed to map absaxis event to key"))
+                Err(FatalError::from("failed to map absaxis event to key"))
             }
-            ControllerOutputEvent::Synchronization(_) => Err(FatalError::Str(
+            ControllerOutputEvent::Synchronization(_) => Err(FatalError::from(
                 "failed to map absaxis event to synchronization",
             )),
             ControllerOutputEvent::FilteredKeys(f) => Ok(OutputEvent::FilteredAbsAxis(
@@ -211,7 +211,7 @@ fn map_in_abs_axis(
             )),
         }
     } else {
-        Err(FatalError::Str(
+        Err(FatalError::from(
             "Requested input axis not present on device",
         ))
     }
@@ -225,20 +225,22 @@ fn map_in_key(
     if dev_info.key_info.contains(input) {
         match output {
             ControllerOutputEvent::AbsAxis(_) => {
-                Err(FatalError::Str("failed to map key event to absaxis"))
+                Err(FatalError::from("failed to map key event to absaxis"))
             }
             ControllerOutputEvent::Key(k) => {
                 Ok(OutputEvent::Key(KeyOutputEvent::new(k.clone(), 0)))
             }
-            ControllerOutputEvent::Synchronization(_) => Err(FatalError::Str(
+            ControllerOutputEvent::Synchronization(_) => Err(FatalError::from(
                 "failed to map key event to synchronization",
             )),
             ControllerOutputEvent::FilteredKeys(_) => {
-                Err(FatalError::Str("failed to map key event to filtered keys"))
+                Err(FatalError::from("failed to map key event to filtered keys"))
             }
         }
     } else {
-        Err(FatalError::Str("Requested input key not present on device"))
+        Err(FatalError::from(
+            "Requested input key not present on device",
+        ))
     }
 }
 

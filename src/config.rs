@@ -14,7 +14,7 @@ use std::{
 
 #[derive(Debug)]
 pub enum FatalError {
-    Str(&'static str),
+    Str(String),
     Io(io::Error),
     SerdeYaml(serde_yaml::Error),
 }
@@ -30,6 +30,12 @@ impl Display for FatalError {
 }
 
 impl Error for FatalError {}
+
+impl From<&'static str> for FatalError {
+    fn from(err: &'static str) -> FatalError {
+        FatalError::Str(String::from(err))
+    }
+}
 
 impl From<io::Error> for FatalError {
     fn from(err: io::Error) -> FatalError {
