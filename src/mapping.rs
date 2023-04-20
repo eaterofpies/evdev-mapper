@@ -1,7 +1,7 @@
 use log::debug;
 
 use crate::{
-    config::{ConfigMap, ControllerEvent},
+    config::{ConfigMap, ControllerInputEvent, ControllerOutputEvent},
     ew_device::Device,
     ew_types::{AbsInfo, AbsoluteAxisType, KeyCode, Synchronization},
 };
@@ -106,21 +106,22 @@ impl OutputEvent {
 
 fn map_in_abs_axis(
     input: &AbsoluteAxisType,
-    output: &ControllerEvent,
+    output: &ControllerOutputEvent,
     dev_info: &DeviceInfo,
 ) -> std::result::Result<OutputEvent, &'static str> {
     let this_dev_info = dev_info.axis_info.iter().find(|(k, _v)| *k == input);
     if let Some((_axis_type, axis_info)) = this_dev_info {
         debug!("Mapping {:?} to {:?} info {:?}", input, output, axis_info);
         match output {
-            ControllerEvent::AbsAxis(a) => Ok(OutputEvent::AbsAxis(AbsAxisOutputEvent {
+            ControllerOutputEvent::AbsAxis(a) => Ok(OutputEvent::AbsAxis(AbsAxisOutputEvent {
                 axis_type: a.clone(),
                 axis_info: *axis_info,
             })),
-            ControllerEvent::Key(_) => Err("failed to map absaxis event to key"),
-            ControllerEvent::Synchronization(_) => {
+            ControllerOutputEvent::Key(_) => Err("failed to map absaxis event to key"),
+            ControllerOutputEvent::Synchronization(_) => {
                 Err("failed to map absaxis event to synchronization")
             }
+            ControllerOutputEvent::FilteredKeys(_) => todo!(),
         }
     } else {
         Err("Requested input axis not present on device")
@@ -129,15 +130,20 @@ fn map_in_abs_axis(
 
 fn map_in_key(
     input: &KeyCode,
-    output: &ControllerEvent,
+    output: &ControllerOutputEvent,
     dev_info: &DeviceInfo,
 ) -> std::result::Result<OutputEvent, &'static str> {
     if dev_info.key_info.contains(input) {
         match output {
-            ControllerEvent::AbsAxis(_) => Err("failed to map key event to absaxis"),
-            ControllerEvent::Key(k) => Ok(OutputEvent::Key(KeyOutputEvent::new(k.clone(), 0))),
-            ControllerEvent::Synchronization(_) => {
+            ControllerOutputEvent::AbsAxis(_) => Err("failed to map key event to absaxis"),
+            ControllerOutputEvent::Key(k) => {
+                Ok(OutputEvent::Key(KeyOutputEvent::new(k.clone(), 0)))
+            }
+            ControllerOutputEvent::Synchronization(_) => {
                 Err("failed to map key event to synchronization")
+            }
+            ControllerOutputEvent::FilteredKeys(_) => {
+                Err("failed to map key event to filtered keys")
             }
         }
     } else {
@@ -146,26 +152,26 @@ fn map_in_key(
 }
 
 fn make_output_mapping(
-    input: &ControllerEvent,
-    output: &ControllerEvent,
+    input: &ControllerInputEvent,
+    output: &ControllerOutputEvent,
     dev_info: &DeviceInfo,
 ) -> Result<OutputEvent, &'static str> {
     match input {
-        ControllerEvent::AbsAxis(a) => map_in_abs_axis(a, output, dev_info),
-        ControllerEvent::Key(k) => map_in_key(k, output, dev_info),
-        ControllerEvent::Synchronization(_a) => {
+        ControllerInputEvent::AbsAxis(a) => map_in_abs_axis(a, output, dev_info),
+        ControllerInputEvent::Key(k) => map_in_key(k, output, dev_info),
+        ControllerInputEvent::Synchronization(_a) => {
             Ok(OutputEvent::Synchronization(SyncOutputEvent::new()))
         }
     }
 }
 
 fn make_dev_mapping(
-    io_mapping: &HashMap<ControllerEvent, ControllerEvent>,
+    io_mapping: &HashMap<ControllerInputEvent, ControllerOutputEvent>,
     axis_info: &DeviceInfo,
-) -> HashMap<ControllerEvent, OutputEvent> {
+) -> HashMap<ControllerInputEvent, OutputEvent> {
     let sync_mapping = HashMap::from([(
-        ControllerEvent::Synchronization(Synchronization(evdev::Synchronization::SYN_REPORT)),
-        ControllerEvent::Synchronization(Synchronization(evdev::Synchronization::SYN_REPORT)),
+        ControllerInputEvent::Synchronization(Synchronization(evdev::Synchronization::SYN_REPORT)),
+        ControllerOutputEvent::Synchronization(Synchronization(evdev::Synchronization::SYN_REPORT)),
     )]);
 
     let all_mapping = sync_mapping.iter().chain(io_mapping.iter());
@@ -175,7 +181,7 @@ fn make_dev_mapping(
         .collect()
 }
 
-pub type EventMapping = HashMap<String, HashMap<ControllerEvent, OutputEvent>>;
+pub type EventMapping = HashMap<String, HashMap<ControllerInputEvent, OutputEvent>>;
 pub fn make_mapping(config: &ConfigMap, paths_and_devs: &HashMap<String, Device>) -> EventMapping {
     let path_and_info: HashMap<_, _> = paths_and_devs
         .iter()

@@ -9,10 +9,9 @@ mod uinput;
 
 use args::Mode;
 use clap::Parser;
-use config::{ConfigMap, ControllerEvent};
-use evdev::InputEventKind;
+use config::{ConfigMap, ControllerInputEvent};
 use ew_device::Device;
-use ew_types::{AbsoluteAxisType, EventStream, InputEvent, KeyCode, Synchronization};
+use ew_types::{EventStream, InputEvent};
 use futures::stream::{FuturesUnordered, StreamExt};
 use log::{debug, error, warn};
 use std::collections::HashMap;
@@ -120,17 +119,7 @@ fn interpret_event(
     event_mappings: &EventMapping,
 ) -> std::result::Result<OutputEvent, NonFatalError> {
     // Make a ControllerEvent from the input
-    let input_event = match event.kind() {
-        InputEventKind::AbsAxis(a) => Ok(ControllerEvent::AbsAxis(AbsoluteAxisType(a))),
-        InputEventKind::Key(a) => Ok(ControllerEvent::Key(KeyCode(a))),
-        InputEventKind::Synchronization(a) => {
-            Ok(ControllerEvent::Synchronization(Synchronization(a)))
-        }
-        _ => Err(NonFatalError::Str(format!(
-            "No handler for event type {:?}",
-            event
-        ))),
-    }?;
+    let input_event = ControllerInputEvent::try_from(event)?;
 
     // Ignore sync events for now as the mapping isn't set up.
     let output_event = event_mappings.get(path).and_then(|m| m.get(&input_event));

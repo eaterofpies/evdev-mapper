@@ -1,4 +1,8 @@
-use crate::ew_types::{AbsoluteAxisType, KeyCode, Synchronization};
+use crate::{
+    ew_types::{self, AbsoluteAxisType, InputEvent, KeyCode, Synchronization},
+    NonFatalError,
+};
+use evdev::InputEventKind;
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -47,19 +51,54 @@ struct DeviceConfig {
 
 #[derive(Debug, Deserialize)]
 struct EventMapping {
-    input_event: ControllerEvent,
-    output_event: ControllerEvent,
+    input_event: ControllerInputEvent,
+    output_event: ControllerOutputEvent,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
-pub enum ControllerEvent {
+pub enum ControllerInputEvent {
     AbsAxis(AbsoluteAxisType),
     Key(KeyCode),
     Synchronization(Synchronization),
 }
 
-pub type ConfigMap = HashMap<String, HashMap<ControllerEvent, ControllerEvent>>;
+impl TryFrom<&InputEvent> for ControllerInputEvent {
+    type Error = NonFatalError;
+
+    fn try_from(event: &InputEvent) -> Result<Self, NonFatalError> {
+        match event.kind() {
+            InputEventKind::Synchronization(s) => Ok(ControllerInputEvent::Synchronization(
+                ew_types::Synchronization(s),
+            )),
+            InputEventKind::Key(k) => Ok(ControllerInputEvent::Key(ew_types::KeyCode(k))),
+            InputEventKind::AbsAxis(a) => {
+                Ok(ControllerInputEvent::AbsAxis(ew_types::AbsoluteAxisType(a)))
+            }
+            _ => Err(NonFatalError::Str(String::from(
+                "Conversion from {:?} to ControllerEvent not implemented",
+            ))),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash)]
+pub struct FilteredKeyMapping {
+    min: i32,
+    max: i32,
+    key: KeyCode,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash)]
+#[serde(untagged)]
+pub enum ControllerOutputEvent {
+    AbsAxis(AbsoluteAxisType),
+    Key(KeyCode),
+    Synchronization(Synchronization),
+    FilteredKeys(Vec<FilteredKeyMapping>),
+}
+
+pub type ConfigMap = HashMap<String, HashMap<ControllerInputEvent, ControllerOutputEvent>>;
 pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     let file = File::open(path)?;
 
@@ -74,7 +113,9 @@ pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     Ok(config_map)
 }
 
-fn mappings_to_map(mappings: Vec<EventMapping>) -> HashMap<ControllerEvent, ControllerEvent> {
+fn mappings_to_map(
+    mappings: Vec<EventMapping>,
+) -> HashMap<ControllerInputEvent, ControllerOutputEvent> {
     let map: HashMap<_, _> = mappings
         .into_iter()
         .map(|m| (m.input_event, m.output_event))
