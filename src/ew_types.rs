@@ -1,3 +1,4 @@
+use evdev::EventType;
 use serde::Deserialize;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -100,6 +101,10 @@ impl PartialEq for Synchronization {
 #[derive(Clone, Debug)]
 pub struct InputEvent(pub evdev::InputEvent);
 impl InputEvent {
+    pub fn new(type_: EventType, code: u16, value: i32) -> Self {
+        Self(evdev::InputEvent::new(type_, code, value))
+    }
+
     pub fn kind(&self) -> evdev::InputEventKind {
         self.0.kind()
     }

@@ -1,9 +1,9 @@
 use log::debug;
 
 use crate::{
-    config::{ConfigMap, ControllerInputEvent, ControllerOutputEvent},
+    config::{ConfigMap, ControllerInputEvent, ControllerOutputEvent, FilteredKeyMapping},
     ew_device::Device,
-    ew_types::{AbsInfo, AbsoluteAxisType, KeyCode, Synchronization},
+    ew_types::{AbsInfo, AbsoluteAxisType, InputEvent, KeyCode, Synchronization},
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -39,6 +39,14 @@ impl AbsAxisOutputEvent {
             axis_info: self.axis_info.clone_set_value(value),
         }
     }
+
+    pub fn to_evdev_event(&self) -> InputEvent {
+        InputEvent::new(
+            evdev::EventType::ABSOLUTE,
+            self.axis_type.0 .0,
+            self.axis_info.0.value(),
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +66,10 @@ impl KeyOutputEvent {
 
     pub fn value(&self) -> i32 {
         self.value
+    }
+
+    pub fn to_evdev_event(&self) -> InputEvent {
+        InputEvent::new(evdev::EventType::KEY, self.code().0 .0, self.value())
     }
 }
 
@@ -83,13 +95,67 @@ impl SyncOutputEvent {
     pub fn value(&self) -> i32 {
         self.value
     }
+
+    pub fn to_evdev_event(&self) -> InputEvent {
+        InputEvent::new(evdev::EventType::SYNCHRONIZATION, self.code(), self.value())
+    }
 }
 
+#[derive(Clone, Debug)]
+pub struct FilteredAbsAxisOutputEvent {
+    axis_type: AbsoluteAxisType,
+    axis_info: AbsInfo,
+    mappings: Vec<FilteredKeyMapping>,
+}
+
+impl FilteredAbsAxisOutputEvent {
+    pub fn new(
+        input_axis_type: AbsoluteAxisType,
+        info: AbsInfo,
+        mappings: Vec<FilteredKeyMapping>,
+    ) -> Self {
+        FilteredAbsAxisOutputEvent {
+            axis_type: input_axis_type,
+            axis_info: info,
+            mappings,
+        }
+    }
+    pub fn codes(&self) -> Vec<KeyCode> {
+        self.mappings.iter().map(|f| f.key.clone()).collect()
+    }
+
+    pub fn clone_set_value(&self, value: i32) -> Self {
+        FilteredAbsAxisOutputEvent {
+            axis_type: self.axis_type.clone(),
+            axis_info: self.axis_info.clone_set_value(value),
+            mappings: self.mappings.clone(),
+        }
+    }
+
+    fn mapping_to_evdev_event(&self, mapping: &FilteredKeyMapping) -> InputEvent {
+        let axis_value = self.axis_info.0.value();
+        let mut out_value = 0;
+        if axis_value >= mapping.min && axis_value <= mapping.max {
+            out_value = 1
+        }
+
+        InputEvent::new(evdev::EventType::KEY, mapping.key.0 .0, out_value)
+    }
+
+    pub fn to_evdev_events(&self) -> Vec<InputEvent> {
+        self.mappings
+            .iter()
+            .map(|e| self.mapping_to_evdev_event(e))
+            .collect()
+    }
+}
+// Can't just use config directly as we need to clone the input axis info and values
 #[derive(Clone, Debug)]
 pub enum OutputEvent {
     AbsAxis(AbsAxisOutputEvent),
     Key(KeyOutputEvent),
     Synchronization(SyncOutputEvent),
+    FilteredAbsAxis(FilteredAbsAxisOutputEvent),
 }
 
 impl OutputEvent {
@@ -100,6 +166,18 @@ impl OutputEvent {
             OutputEvent::Synchronization(s) => {
                 OutputEvent::Synchronization(s.clone_set_value(value))
             }
+            OutputEvent::FilteredAbsAxis(f) => {
+                OutputEvent::FilteredAbsAxis(f.clone_set_value(value))
+            }
+        }
+    }
+
+    pub fn to_evdev_events(&self) -> Vec<InputEvent> {
+        match self {
+            OutputEvent::AbsAxis(a) => vec![a.to_evdev_event()],
+            OutputEvent::Key(k) => vec![k.to_evdev_event()],
+            OutputEvent::Synchronization(s) => vec![s.to_evdev_event()],
+            OutputEvent::FilteredAbsAxis(f) => f.to_evdev_events(),
         }
     }
 }
@@ -110,7 +188,7 @@ fn map_in_abs_axis(
     dev_info: &DeviceInfo,
 ) -> std::result::Result<OutputEvent, &'static str> {
     let this_dev_info = dev_info.axis_info.iter().find(|(k, _v)| *k == input);
-    if let Some((_axis_type, axis_info)) = this_dev_info {
+    if let Some((axis_type, axis_info)) = this_dev_info {
         debug!("Mapping {:?} to {:?} info {:?}", input, output, axis_info);
         match output {
             ControllerOutputEvent::AbsAxis(a) => Ok(OutputEvent::AbsAxis(AbsAxisOutputEvent {
@@ -121,7 +199,9 @@ fn map_in_abs_axis(
             ControllerOutputEvent::Synchronization(_) => {
                 Err("failed to map absaxis event to synchronization")
             }
-            ControllerOutputEvent::FilteredKeys(_) => todo!(),
+            ControllerOutputEvent::FilteredKeys(f) => Ok(OutputEvent::FilteredAbsAxis(
+                FilteredAbsAxisOutputEvent::new(axis_type.clone(), *axis_info, f.clone()),
+            )),
         }
     } else {
         Err("Requested input axis not present on device")

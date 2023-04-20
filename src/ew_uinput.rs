@@ -1,6 +1,6 @@
 use std::{io::Error, path::PathBuf};
 
-use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, InputEvent, UinputAbsSetup};
+use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, UinputAbsSetup};
 
 use crate::mapping::OutputEvent;
 
@@ -21,6 +21,11 @@ fn make_uniput_config(
             }
             OutputEvent::Key(a) => keys.insert(a.code().0),
             OutputEvent::Synchronization(_) => (),
+            OutputEvent::FilteredAbsAxis(f) => {
+                for item in f.codes() {
+                    keys.insert(item.0)
+                }
+            }
         }
     }
 
@@ -42,18 +47,8 @@ fn build_device(
     Ok(VirtualDevice(device))
 }
 
-fn wrangle_output_event(event: &OutputEvent) -> evdev::InputEvent {
-    match event {
-        OutputEvent::AbsAxis(a) => evdev::InputEvent::new(
-            evdev::EventType::ABSOLUTE,
-            a.axis_type.0 .0,
-            a.axis_info.0.value(),
-        ),
-        OutputEvent::Key(k) => InputEvent::new(evdev::EventType::KEY, k.code().0 .0, k.value()),
-        OutputEvent::Synchronization(s) => {
-            InputEvent::new(evdev::EventType::SYNCHRONIZATION, s.code(), s.value())
-        }
-    }
+fn wrangle_output_event(event: &OutputEvent) -> Vec<evdev::InputEvent> {
+    event.to_evdev_events().iter().map(|e| e.0).collect()
 }
 
 impl VirtualDevice {
@@ -75,7 +70,7 @@ impl VirtualDevice {
 
     pub fn emit(&mut self, events: &[OutputEvent]) -> Result<(), Error> {
         let evdev_events: Vec<evdev::InputEvent> =
-            events.iter().map(wrangle_output_event).collect();
+            events.iter().flat_map(wrangle_output_event).collect();
         self.0.emit(&evdev_events)
     }
 }

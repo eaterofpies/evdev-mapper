@@ -84,9 +84,9 @@ impl TryFrom<&InputEvent> for ControllerInputEvent {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash)]
 pub struct FilteredKeyMapping {
-    min: i32,
-    max: i32,
-    key: KeyCode,
+    pub min: i32,
+    pub max: i32,
+    pub key: KeyCode,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash)]
