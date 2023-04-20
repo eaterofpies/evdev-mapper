@@ -6,6 +6,7 @@ use evdev::InputEventKind;
 use serde::Deserialize;
 use std::{
     collections::HashMap,
+    error::Error,
     fmt::{Display, Formatter},
     fs::File,
     io,
@@ -13,6 +14,7 @@ use std::{
 
 #[derive(Debug)]
 pub enum FatalError {
+    Str(&'static str),
     Io(io::Error),
     SerdeYaml(serde_yaml::Error),
 }
@@ -22,9 +24,12 @@ impl Display for FatalError {
         match self {
             Self::Io(e) => Display::fmt(e, f),
             Self::SerdeYaml(e) => Display::fmt(e, f),
+            Self::Str(e) => Display::fmt(e, f),
         }
     }
 }
+
+impl Error for FatalError {}
 
 impl From<io::Error> for FatalError {
     fn from(err: io::Error) -> FatalError {

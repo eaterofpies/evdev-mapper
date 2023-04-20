@@ -66,7 +66,7 @@ async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
     let paths: Vec<_> = config.iter().map(|(p, _m)| p.to_owned()).collect();
     let paths_and_devs = device::open_devices(paths)?;
 
-    let mappings = make_mapping(&config, &paths_and_devs);
+    let mappings = make_mapping(&config, &paths_and_devs)?;
 
     combine_devices(paths_and_devs, mappings).await
 }
