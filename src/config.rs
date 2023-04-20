@@ -1,53 +1,10 @@
 use crate::{
+    error::{FatalError, NonFatalError},
     ew_types::{self, AbsoluteAxisType, InputEvent, KeyCode, Synchronization},
-    NonFatalError,
 };
 use evdev::InputEventKind;
 use serde::Deserialize;
-use std::{
-    collections::HashMap,
-    error::Error,
-    fmt::{Display, Formatter},
-    fs::File,
-    io,
-};
-
-#[derive(Debug)]
-pub enum FatalError {
-    Str(String),
-    Io(io::Error),
-    SerdeYaml(serde_yaml::Error),
-}
-
-impl Display for FatalError {
-    fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
-        match self {
-            Self::Io(e) => Display::fmt(e, f),
-            Self::SerdeYaml(e) => Display::fmt(e, f),
-            Self::Str(e) => Display::fmt(e, f),
-        }
-    }
-}
-
-impl Error for FatalError {}
-
-impl From<&'static str> for FatalError {
-    fn from(err: &'static str) -> FatalError {
-        FatalError::Str(String::from(err))
-    }
-}
-
-impl From<io::Error> for FatalError {
-    fn from(err: io::Error) -> FatalError {
-        FatalError::Io(err)
-    }
-}
-
-impl From<serde_yaml::Error> for FatalError {
-    fn from(err: serde_yaml::Error) -> FatalError {
-        FatalError::SerdeYaml(err)
-    }
-}
+use std::{collections::HashMap, fs::File};
 
 #[derive(Debug, Deserialize)]
 struct Config {
@@ -86,9 +43,9 @@ impl TryFrom<&InputEvent> for ControllerInputEvent {
             InputEventKind::AbsAxis(a) => {
                 Ok(ControllerInputEvent::AbsAxis(ew_types::AbsoluteAxisType(a)))
             }
-            _ => Err(NonFatalError::Str(String::from(
+            _ => Err(NonFatalError::from(
                 "Conversion from {:?} to ControllerEvent not implemented",
-            ))),
+            )),
         }
     }
 }

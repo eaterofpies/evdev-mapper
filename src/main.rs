@@ -1,6 +1,7 @@
 mod args;
 mod config;
 mod device;
+mod error;
 mod ew_device;
 mod ew_types;
 mod ew_uinput;
@@ -20,11 +21,7 @@ use std::error::Error;
 use mapping::{make_mapping, EventMapping, OutputEvent};
 use uinput::new_device;
 
-#[derive(Debug)]
-pub enum NonFatalError {
-    Io(std::io::Error),
-    Str(String),
-}
+use crate::error::NonFatalError;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -126,7 +123,7 @@ fn interpret_event(
 
     match output_event {
         Some(oe) => Ok(oe.clone_set_value(event.0.value())),
-        None => Err(NonFatalError::Str(format!(
+        None => Err(NonFatalError::from(format!(
             "No mapping for event type {:?}",
             event
         ))),

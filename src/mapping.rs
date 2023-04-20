@@ -1,9 +1,8 @@
 use log::debug;
 
 use crate::{
-    config::{
-        ConfigMap, ControllerInputEvent, ControllerOutputEvent, FatalError, FilteredKeyMapping,
-    },
+    config::{ConfigMap, ControllerInputEvent, ControllerOutputEvent, FilteredKeyMapping},
+    error::FatalError,
     ew_device::Device,
     ew_types::{AbsInfo, AbsoluteAxisType, InputEvent, KeyCode, Synchronization},
 };
