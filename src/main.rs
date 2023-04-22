@@ -6,6 +6,7 @@ mod ew_device;
 mod ew_types;
 mod ew_uinput;
 mod mapping;
+mod output_event;
 mod uinput;
 
 use args::Mode;

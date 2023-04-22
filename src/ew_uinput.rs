@@ -2,7 +2,7 @@ use std::{io::Error, path::PathBuf};
 
 use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, UinputAbsSetup};
 
-use crate::mapping::OutputEvent;
+use crate::output_event::OutputEvent;
 
 pub struct VirtualDevice(evdev::uinput::VirtualDevice);
 
