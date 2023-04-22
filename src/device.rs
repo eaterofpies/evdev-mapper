@@ -1,6 +1,27 @@
-use std::{collections::HashMap, io::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Error,
+};
 
-use crate::ew_device::Device;
+use crate::{
+    ew_device::Device,
+    ew_types::{AbsInfo, AbsoluteAxisType, KeyCode},
+};
+
+pub struct DeviceInfo {
+    pub axis_info: HashMap<AbsoluteAxisType, AbsInfo>,
+    pub key_info: HashSet<KeyCode>,
+}
+
+pub fn get_device_info(device: &Device) -> Result<DeviceInfo, Error> {
+    let key_info: HashSet<KeyCode> = device.supported_keys();
+    let axis_info = device.get_abs_state()?;
+
+    Ok(DeviceInfo {
+        axis_info,
+        key_info,
+    })
+}
 
 fn print_list_item(path: &str, phy_path: &str, name: &str) {
     println!("| {0: <20} | {1:<30} | {2:}", path, phy_path, name)

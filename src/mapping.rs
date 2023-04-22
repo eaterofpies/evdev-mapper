@@ -2,33 +2,12 @@ use log::debug;
 
 use crate::{
     config::{ConfigMap, ControllerInputEvent, ControllerOutputEvent, FilteredKeyMapping},
+    device::{get_device_info, DeviceInfo},
     error::{FatalError, NonFatalError},
     ew_device::Device,
     ew_types::{AbsInfo, AbsoluteAxisType, InputEvent, KeyCode, Synchronization},
 };
-use std::{
-    collections::{HashMap, HashSet},
-    io::Error,
-};
-
-struct DeviceInfo {
-    axis_info: HashMap<AbsoluteAxisType, AbsInfo>,
-    key_info: HashSet<KeyCode>,
-}
-
-fn get_device_info(path: String, device: &Device) -> Result<(String, DeviceInfo), Error> {
-    let key_info: HashSet<KeyCode> = device.supported_keys();
-
-    let axis_info = device.get_abs_state()?;
-
-    Ok((
-        path,
-        DeviceInfo {
-            axis_info,
-            key_info,
-        },
-    ))
-}
+use std::{collections::HashMap, io::Error};
 
 #[derive(Clone, Debug)]
 pub struct AbsAxisOutputEvent {
@@ -318,13 +297,17 @@ impl EventMapping {
         }
     }
 
+    fn get_device_info(path: String, device: &Device) -> Result<(String, DeviceInfo), Error> {
+        Ok((path, get_device_info(device)?))
+    }
+
     pub fn new(
         config: &ConfigMap,
         paths_and_devs: &HashMap<String, Device>,
     ) -> Result<Self, FatalError> {
         let path_and_info_or_error: Result<HashMap<_, _>, Error> = paths_and_devs
             .iter()
-            .map(|(p, d)| get_device_info(p.clone(), d))
+            .map(|(p, d)| Self::get_device_info(p.clone(), d))
             .collect();
 
         let path_and_info = path_and_info_or_error?;
