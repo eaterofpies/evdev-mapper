@@ -13,6 +13,7 @@ use clap::Parser;
 use config::{ConfigMap, ControllerInputEvent};
 use ew_device::Device;
 use ew_types::{EventStream, InputEvent};
+use ew_uinput::VirtualDevice;
 use futures::stream::{FuturesUnordered, StreamExt};
 use log::{debug, error, warn};
 use std::collections::HashMap;
@@ -65,12 +66,15 @@ async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
 
     let mappings = make_mapping(&config, &paths_and_devs)?;
 
-    combine_devices(paths_and_devs, mappings).await
+    let output_device = new_device(&mappings)?;
+
+    combine_devices(paths_and_devs, mappings, output_device).await
 }
 
 async fn combine_devices(
     devices: HashMap<String, Device>,
     mappings: EventMapping,
+    mut output_device: VirtualDevice,
 ) -> Result<(), Box<dyn Error>> {
     // Setup event streams
     let mut streams: HashMap<_, _> = devices
@@ -78,36 +82,37 @@ async fn combine_devices(
         .map(|(p, d)| (p, d.into_event_stream().unwrap()))
         .collect();
 
-    let mut output_device = new_device(&mappings)?;
-
     loop {
         // Setup futures for the event sources
         let mut futures = FuturesUnordered::from_iter(
             streams.iter_mut().map(|(p, s)| next_event_with_meta(p, s)),
         );
 
-        // wait for an event
-        if let Some((path, event)) = futures.next().await {
-            let result = interpret_event(&path, &event, &mappings);
+        let result = match futures.next().await {
+            Some((path, event)) => process_single_event(path, event, &mappings, &mut output_device),
+            None => Ok(()),
+        };
 
-            let result = match result {
-                Ok(ev) => {
-                    debug!("writing event {:?}", ev);
-                    output_device.emit(&[ev]).map_err(NonFatalError::Io)
-                }
-                Err(err) => Err(err),
-            };
-
-            match result {
-                Ok(_) => (),
-                Err(e) => warn!("{:?}", e),
-            }
-        }
+        match result {
+            Ok(_) => (),
+            Err(e) => warn!("{:?}", e),
+        };
     }
 }
 
 async fn next_event_with_meta(path: &String, stream: &mut EventStream) -> (String, InputEvent) {
     (path.to_owned(), stream.next_event().await.unwrap())
+}
+
+fn process_single_event(
+    path: String,
+    event: InputEvent,
+    mappings: &EventMapping,
+    device: &mut VirtualDevice,
+) -> Result<(), NonFatalError> {
+    let event = interpret_event(&path, &event, mappings)?;
+    debug!("writing event {:?}", event);
+    device.emit(&[event]).map_err(NonFatalError::Io)
 }
 
 fn interpret_event(
