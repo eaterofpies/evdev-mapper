@@ -10,7 +10,7 @@ mod uinput;
 
 use args::Mode;
 use clap::Parser;
-use config::{ConfigMap, ControllerInputEvent};
+use config::ConfigMap;
 use ew_device::Device;
 use ew_types::{EventStream, InputEvent};
 use ew_uinput::VirtualDevice;
@@ -19,7 +19,7 @@ use log::{debug, error, warn};
 use std::collections::HashMap;
 use std::error::Error;
 
-use mapping::{make_mapping, EventMapping, OutputEvent};
+use mapping::EventMapping;
 use uinput::new_device;
 
 use crate::error::NonFatalError;
@@ -64,7 +64,7 @@ async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
     let paths: Vec<_> = config.iter().map(|(p, _m)| p.to_owned()).collect();
     let paths_and_devs = device::open_devices(paths)?;
 
-    let mappings = make_mapping(&config, &paths_and_devs)?;
+    let mappings = EventMapping::new(&config, &paths_and_devs)?;
 
     let output_device = new_device(&mappings)?;
 
@@ -110,27 +110,7 @@ fn process_single_event(
     mappings: &EventMapping,
     device: &mut VirtualDevice,
 ) -> Result<(), NonFatalError> {
-    let event = interpret_event(&path, &event, mappings)?;
+    let event = mappings.get_output_event(&path, &event)?;
     debug!("writing event {:?}", event);
     device.emit(&[event]).map_err(NonFatalError::Io)
-}
-
-fn interpret_event(
-    path: &String,
-    event: &InputEvent,
-    event_mappings: &EventMapping,
-) -> std::result::Result<OutputEvent, NonFatalError> {
-    // Make a ControllerEvent from the input
-    let input_event = ControllerInputEvent::try_from(event)?;
-
-    // Ignore sync events for now as the mapping isn't set up.
-    let output_event = event_mappings.get(path).and_then(|m| m.get(&input_event));
-
-    match output_event {
-        Some(oe) => Ok(oe.clone_set_value(event.0.value())),
-        None => Err(NonFatalError::from(format!(
-            "No mapping for event type {:?}",
-            event
-        ))),
-    }
 }
