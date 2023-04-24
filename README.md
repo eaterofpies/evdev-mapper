@@ -42,34 +42,34 @@ In the configuration file you can specify one or more inputs devices and how to 
 ```
 - path: <path to input device 1>
   mappings:
-    - input_event: <input 1>
-      output_event: <output 1>
-    - input_event: <input 2>
-      output_event: <output 2>
+    - input: <input 1>
+      output: <output 1>
+    - input: <input 2>
+      output: <output 2>
     ...
 - path: <path to input device 2>
   mappings:
-    - input_event: <input 3>
-      output_event: <output 3>
+    - input: <input 3>
+      output: <output 3>
     ...
 ```
 
 You can map
 - A button to a button
     ```
-    - input_event: BTN_0
-      output_event: BTN_1
+    - input: BTN_0
+      output: BTN_1
     ```
 - An absolute axis to an absolute axis
     ```
-    - input_event: ABS_X
-      output_event: ABS_Y
+    - input: ABS_X
+      output: ABS_Y
     ```
 - A range of an absolute axis to a button
     ```
     # map a hat switch axis to 2 buttons
-    - input_event: ABS_HAT0X
-      output_event:
+    - input: ABS_HAT0X
+      output:
           - min: 1
             max: 1
             key: BTN_0
