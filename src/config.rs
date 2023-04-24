@@ -18,17 +18,24 @@ struct DeviceConfig {
 }
 
 #[derive(Debug, Deserialize)]
-struct EventMapping {
-    input_event: ControllerInputEvent,
-    output_event: ControllerOutputEvent,
+#[serde(untagged)]
+
+pub enum EventMapping {
+    KeyEvent {
+        input: KeyCode,
+        output: KeyCode,
+    },
+    AbsAxisEvent {
+        input: AbsoluteAxisType,
+        output: AbsAxisEvent,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(untagged)]
-pub enum ControllerInputEvent {
+pub enum AbsAxisEvent {
     AbsAxis(AbsoluteAxisType),
-    Key(KeyCode),
-    Synchronization(Synchronization),
+    FilteredKeys(Vec<FilteredKeyMapping>),
 }
 
 impl TryFrom<&InputEvent> for ControllerInputEvent {
@@ -57,8 +64,14 @@ pub struct FilteredKeyMapping {
     pub key: KeyCode,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash)]
-#[serde(untagged)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ControllerInputEvent {
+    AbsAxis(AbsoluteAxisType),
+    Key(KeyCode),
+    Synchronization(Synchronization),
+}
+
+#[derive(Debug)]
 pub enum ControllerOutputEvent {
     AbsAxis(AbsoluteAxisType),
     Key(KeyCode),
@@ -81,12 +94,25 @@ pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     Ok(config_map)
 }
 
+fn mapping_to_tuple(mapping: EventMapping) -> (ControllerInputEvent, ControllerOutputEvent) {
+    match mapping {
+        EventMapping::KeyEvent { input, output } => (
+            ControllerInputEvent::Key(input),
+            ControllerOutputEvent::Key(output),
+        ),
+        EventMapping::AbsAxisEvent { input, output } => {
+            let output = match output {
+                AbsAxisEvent::AbsAxis(a) => ControllerOutputEvent::AbsAxis(a),
+                AbsAxisEvent::FilteredKeys(k) => ControllerOutputEvent::FilteredKeys(k),
+            };
+            (ControllerInputEvent::AbsAxis(input), output)
+        }
+    }
+}
+
 fn mappings_to_map(
     mappings: Vec<EventMapping>,
 ) -> HashMap<ControllerInputEvent, ControllerOutputEvent> {
-    let map: HashMap<_, _> = mappings
-        .into_iter()
-        .map(|m| (m.input_event, m.output_event))
-        .collect();
+    let map: HashMap<_, _> = mappings.into_iter().map(mapping_to_tuple).collect();
     map
 }
