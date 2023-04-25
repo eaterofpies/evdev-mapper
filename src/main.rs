@@ -17,7 +17,7 @@ use ew_types::{EventStream, InputEvent};
 use ew_uinput::VirtualDevice;
 use futures::stream::{FuturesUnordered, StreamExt};
 use log::{debug, error, warn};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 use mapping::EventMapping;
@@ -62,10 +62,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
-    let paths: Vec<_> = config.iter().map(|(p, _m)| p.to_owned()).collect();
+    let paths: HashSet<_> = config.iter().map(|((p, _i), _m)| p.clone()).collect();
     let paths_and_devs = device::open_devices(paths)?;
 
-    let mappings = EventMapping::new(&config, &paths_and_devs)?;
+    let mappings = EventMapping::new(config, &paths_and_devs)?;
 
     let output_device = new_device(&mappings)?;
 

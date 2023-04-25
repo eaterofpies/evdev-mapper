@@ -83,7 +83,7 @@ pub fn properties(path: String) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn open_devices(paths: Vec<String>) -> Result<HashMap<String, Device>, Error> {
+pub fn open_devices(paths: HashSet<String>) -> Result<HashMap<String, Device>, Error> {
     let mut devices: HashMap<String, Device> = HashMap::new();
 
     for path in paths {

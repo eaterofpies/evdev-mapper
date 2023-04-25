@@ -50,6 +50,12 @@ impl KeyOutputEvent {
     }
 }
 
+impl From<KeyCode> for KeyOutputEvent {
+    fn from(k: KeyCode) -> Self {
+        KeyOutputEvent { code: k, value: 0 }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SyncOutputEvent {
     code: u16,

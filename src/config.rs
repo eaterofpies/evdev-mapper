@@ -17,9 +17,8 @@ struct DeviceConfig {
     mappings: Vec<EventMapping>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
-
 pub enum EventMapping {
     KeyEvent {
         input: KeyCode,
@@ -36,6 +35,12 @@ pub enum EventMapping {
 pub enum AbsAxisEvent {
     AbsAxis(AbsoluteAxisType),
     FilteredKeys(Vec<FilteredKeyMapping>),
+}
+
+impl From<AbsoluteAxisType> for AbsAxisEvent {
+    fn from(t: AbsoluteAxisType) -> Self {
+        AbsAxisEvent::AbsAxis(t)
+    }
 }
 
 impl TryFrom<&InputEvent> for ControllerInputEvent {
@@ -71,15 +76,27 @@ pub enum ControllerInputEvent {
     Synchronization(Synchronization),
 }
 
-#[derive(Debug)]
-pub enum ControllerOutputEvent {
-    AbsAxis(AbsoluteAxisType),
-    Key(KeyCode),
-    Synchronization(Synchronization),
-    FilteredKeys(Vec<FilteredKeyMapping>),
+impl From<KeyCode> for ControllerInputEvent {
+    fn from(k: KeyCode) -> Self {
+        ControllerInputEvent::Key(k)
+    }
 }
 
-pub type ConfigMap = HashMap<String, HashMap<ControllerInputEvent, ControllerOutputEvent>>;
+impl From<AbsoluteAxisType> for ControllerInputEvent {
+    fn from(a: AbsoluteAxisType) -> Self {
+        ControllerInputEvent::AbsAxis(a)
+    }
+}
+impl From<EventMapping> for ControllerInputEvent {
+    fn from(mapping: EventMapping) -> Self {
+        match mapping {
+            EventMapping::KeyEvent { input, output: _ } => ControllerInputEvent::Key(input),
+            EventMapping::AbsAxisEvent { input, output: _ } => ControllerInputEvent::AbsAxis(input),
+        }
+    }
+}
+
+pub type ConfigMap = HashMap<(String, ControllerInputEvent), EventMapping>;
 pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     let file = File::open(path)?;
 
@@ -88,31 +105,19 @@ pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     let config_map: HashMap<_, _> = config
         .devices
         .into_iter()
-        .map(|d| (d.path, mappings_to_map(d.mappings)))
+        .flat_map(|d| mappings_to_map(d.path, d.mappings))
         .collect();
+
     println!("{:?}", config_map);
     Ok(config_map)
 }
 
-fn mapping_to_tuple(mapping: EventMapping) -> (ControllerInputEvent, ControllerOutputEvent) {
-    match mapping {
-        EventMapping::KeyEvent { input, output } => (
-            ControllerInputEvent::Key(input),
-            ControllerOutputEvent::Key(output),
-        ),
-        EventMapping::AbsAxisEvent { input, output } => {
-            let output = match output {
-                AbsAxisEvent::AbsAxis(a) => ControllerOutputEvent::AbsAxis(a),
-                AbsAxisEvent::FilteredKeys(k) => ControllerOutputEvent::FilteredKeys(k),
-            };
-            (ControllerInputEvent::AbsAxis(input), output)
-        }
-    }
-}
-
 fn mappings_to_map(
+    path: String,
     mappings: Vec<EventMapping>,
-) -> HashMap<ControllerInputEvent, ControllerOutputEvent> {
-    let map: HashMap<_, _> = mappings.into_iter().map(mapping_to_tuple).collect();
-    map
+) -> HashMap<(String, ControllerInputEvent), EventMapping> {
+    mappings
+        .into_iter()
+        .map(|m| ((path.clone(), m.clone().into()), m))
+        .collect()
 }
