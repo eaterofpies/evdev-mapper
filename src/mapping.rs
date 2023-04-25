@@ -3,7 +3,7 @@ use crate::{
     device::{get_device_info, DeviceInfo},
     error::{FatalError, NonFatalError},
     ew_device::Device,
-    ew_types::{InputEvent, Synchronization},
+    ew_types::{AbsoluteAxisType, InputEvent, Synchronization},
     output_event::{
         AbsAxisOutputEvent, FilteredAbsAxisOutputEvent, KeyOutputEvent, OutputEvent,
         SyncOutputEvent,
@@ -20,6 +20,27 @@ impl EventMapping {
         Ok((path, get_device_info(device)?))
     }
 
+    fn make_abs_axis_mapping(
+        device_info: &DeviceInfo,
+        axis_type: AbsoluteAxisType,
+        axis_event: config::AbsAxisEvent,
+    ) -> OutputEvent {
+        let (_, axis_info) = device_info
+            .axis_info
+            .iter()
+            .find(|(k, _v)| *k == &axis_type)
+            .unwrap();
+        match axis_event {
+            config::AbsAxisEvent::AbsAxis(a) => OutputEvent::AbsAxis(AbsAxisOutputEvent {
+                axis_type: a,
+                axis_info: *axis_info,
+            }),
+            config::AbsAxisEvent::FilteredKeys(f) => OutputEvent::FilteredAbsAxis(
+                FilteredAbsAxisOutputEvent::new(axis_type.clone(), *axis_info, f),
+            ),
+        }
+    }
+
     fn make_mapping(
         path: String,
         event: ControllerInputEvent,
@@ -31,21 +52,7 @@ impl EventMapping {
                 OutputEvent::Key(KeyOutputEvent::new(output, 0))
             }
             config::EventMapping::AbsAxisEvent { input, output } => {
-                let this_dev_info = device_info
-                    .axis_info
-                    .iter()
-                    .find(|(k, _v)| *k == &input)
-                    .unwrap();
-                let (axis_type, axis_info) = this_dev_info;
-                match output {
-                    config::AbsAxisEvent::AbsAxis(a) => OutputEvent::AbsAxis(AbsAxisOutputEvent {
-                        axis_type: a,
-                        axis_info: *axis_info,
-                    }),
-                    config::AbsAxisEvent::FilteredKeys(f) => OutputEvent::FilteredAbsAxis(
-                        FilteredAbsAxisOutputEvent::new(axis_type.clone(), *axis_info, f),
-                    ),
-                }
+                Self::make_abs_axis_mapping(device_info, input, output)
             }
         };
         ((path, event), output)
@@ -72,7 +79,7 @@ impl EventMapping {
 
         let input_mappings: HashMap<(String, ControllerInputEvent), OutputEvent> = config
             .into_iter()
-            .map(|((p, i), m)| EventMapping::make_mapping(p.clone(), i, m, &path_and_info[&p]))
+            .map(|((p, i), m)| Self::make_mapping(p.clone(), i, m, &path_and_info[&p]))
             .collect();
 
         let builtins: HashMap<(String, ControllerInputEvent), OutputEvent> = paths_and_devs
