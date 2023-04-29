@@ -12,6 +12,15 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "build release",
+            "type": "shell",
+            "command": "cargo build --release",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+            }
         }
     ]
 }
