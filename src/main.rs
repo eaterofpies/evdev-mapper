@@ -12,6 +12,7 @@ mod uinput;
 use args::Mode;
 use clap::Parser;
 use config::ConfigMap;
+use error::FatalError;
 use ew_device::Device;
 use ew_types::{EventStream, InputEvent};
 use ew_uinput::VirtualDevice;
@@ -72,16 +73,23 @@ async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
     combine_devices(paths_and_devs, mappings, output_device).await
 }
 
+fn make_stream(path: String, device: Device) -> Result<(String, EventStream), FatalError> {
+    let dev = device.into_event_stream()?;
+    Ok((path, dev))
+}
+
 async fn combine_devices(
     devices: HashMap<String, Device>,
     mappings: EventMapping,
     mut output_device: VirtualDevice,
 ) -> Result<(), Box<dyn Error>> {
     // Setup event streams
-    let mut streams: HashMap<_, _> = devices
+    let streams_or_error: Result<HashMap<_, _>, _> = devices
         .into_iter()
-        .map(|(p, d)| (p, d.into_event_stream().unwrap()))
+        .map(|(p, d)| make_stream(p, d))
         .collect();
+
+    let mut streams = streams_or_error?;
 
     loop {
         // Setup futures for the event sources
@@ -89,8 +97,17 @@ async fn combine_devices(
             streams.iter_mut().map(|(p, s)| next_event_with_meta(p, s)),
         );
 
-        let result = match futures.next().await {
-            Some((path, event)) => process_single_event(path, event, &mappings, &mut output_device),
+        let event = futures.next().await;
+        let result = match event {
+            // Futures.next returned something that was ok
+            Some(Ok((path, event))) => {
+                process_single_event(path, event, &mappings, &mut output_device)
+            }
+
+            // Futures.next returned something that was an error
+            Some(Err(e)) => Err(e)?,
+
+            // Futures.next returned nothing
             None => Ok(()),
         };
 
@@ -101,8 +118,12 @@ async fn combine_devices(
     }
 }
 
-async fn next_event_with_meta(path: &String, stream: &mut EventStream) -> (String, InputEvent) {
-    (path.to_owned(), stream.next_event().await.unwrap())
+async fn next_event_with_meta(
+    path: &String,
+    stream: &mut EventStream,
+) -> Result<(String, InputEvent), FatalError> {
+    let next_event = stream.next_event().await?;
+    Ok((path.to_owned(), next_event))
 }
 
 fn process_single_event(

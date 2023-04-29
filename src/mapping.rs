@@ -24,13 +24,17 @@ impl EventMapping {
         device_info: &DeviceInfo,
         axis_type: AbsoluteAxisType,
         axis_event: config::AbsAxisEvent,
-    ) -> OutputEvent {
+    ) -> Result<OutputEvent, FatalError> {
         let (_, axis_info) = device_info
             .axis_info
             .iter()
             .find(|(k, _v)| *k == &axis_type)
-            .unwrap();
-        match axis_event {
+            .ok_or(format!(
+                "Failed to find axis info for input axis {:?}",
+                axis_type
+            ))?;
+
+        let output_event = match axis_event {
             config::AbsAxisEvent::AbsAxis(a) => OutputEvent::AbsAxis(AbsAxisOutputEvent {
                 axis_type: a,
                 axis_info: *axis_info,
@@ -38,7 +42,9 @@ impl EventMapping {
             config::AbsAxisEvent::FilteredKeys(f) => OutputEvent::FilteredAbsAxis(
                 FilteredAbsAxisOutputEvent::new(axis_type.clone(), *axis_info, f),
             ),
-        }
+        };
+
+        Ok(output_event)
     }
 
     fn make_mapping(
@@ -46,16 +52,17 @@ impl EventMapping {
         event: ControllerInputEvent,
         mapping: config::EventMapping,
         device_info: &DeviceInfo,
-    ) -> ((String, ControllerInputEvent), OutputEvent) {
+    ) -> Result<((String, ControllerInputEvent), OutputEvent), FatalError> {
         let output = match mapping {
             config::EventMapping::KeyEvent { input: _, output } => {
                 OutputEvent::Key(KeyOutputEvent::new(output, 0))
             }
             config::EventMapping::AbsAxisEvent { input, output } => {
-                Self::make_abs_axis_mapping(device_info, input, output)
+                Self::make_abs_axis_mapping(device_info, input, output)?
             }
         };
-        ((path, event), output)
+
+        Ok(((path, event), output))
     }
 
     fn make_sync_mapping(path: String) -> ((String, ControllerInputEvent), OutputEvent) {
@@ -77,10 +84,12 @@ impl EventMapping {
 
         let path_and_info = path_and_info_or_error?;
 
-        let input_mappings: HashMap<(String, ControllerInputEvent), OutputEvent> = config
+        let input_mappings_or_error: Result<HashMap<(_, _), _>, FatalError> = config
             .into_iter()
             .map(|((p, i), m)| Self::make_mapping(p.clone(), i, m, &path_and_info[&p]))
             .collect();
+
+        let input_mappings = input_mappings_or_error?;
 
         let builtins: HashMap<(String, ControllerInputEvent), OutputEvent> = paths_and_devs
             .iter()

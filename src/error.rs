@@ -29,6 +29,12 @@ impl From<&'static str> for FatalError {
     }
 }
 
+impl From<String> for FatalError {
+    fn from(err: String) -> FatalError {
+        FatalError::Str(err)
+    }
+}
+
 impl From<io::Error> for FatalError {
     fn from(err: io::Error) -> FatalError {
         FatalError::Io(err)
