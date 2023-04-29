@@ -1,9 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Error,
+    path::PathBuf,
 };
 
 use crate::{
+    config::ControllerId,
+    error::FatalError,
     ew_device::Device,
     ew_types::{AbsInfo, AbsoluteAxisType, KeyCode},
 };
@@ -67,14 +70,42 @@ fn print_properties(device: &Device) -> Result<(), Error> {
     Ok(())
 }
 
-fn open_device(path: &String) -> Result<Device, Error> {
+fn find_device_by_name(name: &String) -> Result<PathBuf, FatalError> {
+    let devices = evdev::enumerate().collect::<HashMap<_, _>>();
+    let devs_with_name: HashMap<_, _> = devices
+        .iter()
+        .filter(|(_, d)| d.name().unwrap_or("") == name)
+        .collect();
+    match devs_with_name.len() {
+        1 => {
+            let path: Vec<&PathBuf> = devs_with_name.into_keys().collect();
+            println!("looked up name {:?} to path {:?}", name, path[0]);
+            Ok(path[0].to_owned())
+        }
+        0 => Err(FatalError::from(format!(
+            "No device with name {:?} found",
+            name
+        ))),
+        _ => Err(FatalError::from(format!(
+            "Too many devices with name {:?} found",
+            name
+        ))),
+    }
+}
+
+fn open_device(id: ControllerId) -> Result<(ControllerId, Device), FatalError> {
+    let path = match &id {
+        ControllerId::Path(path) => path.clone(),
+        ControllerId::Name(name) => find_device_by_name(name)?,
+    };
+
     let mut device = Device::open(path)?;
 
     // Grab the device to stop duplicate events from multiple devices
     device.grab()?;
 
     print_properties(&device)?;
-    Ok(device)
+    Ok((id, device))
 }
 
 pub fn properties(path: String) -> Result<(), Error> {
@@ -83,13 +114,11 @@ pub fn properties(path: String) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn open_devices(paths: HashSet<String>) -> Result<HashMap<String, Device>, Error> {
-    let mut devices: HashMap<String, Device> = HashMap::new();
+pub fn open_devices(
+    ids: HashSet<ControllerId>,
+) -> Result<HashMap<ControllerId, Device>, FatalError> {
+    let devices_or_error: Result<HashMap<ControllerId, Device>, FatalError> =
+        ids.into_iter().map(open_device).collect();
 
-    for path in paths {
-        let device = open_device(&path)?;
-        devices.insert(path.clone(), device);
-    }
-
-    Ok(devices)
+    devices_or_error
 }

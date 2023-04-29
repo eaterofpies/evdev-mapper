@@ -4,7 +4,7 @@ use crate::{
 };
 use evdev::InputEventKind;
 use serde::Deserialize;
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, fs::File, path::PathBuf};
 
 #[derive(Debug, Deserialize)]
 struct Config {
@@ -12,9 +12,17 @@ struct Config {
 }
 
 #[derive(Debug, Deserialize)]
-struct DeviceConfig {
-    path: String,
-    mappings: Vec<EventMapping>,
+#[serde(untagged)]
+
+pub enum DeviceConfig {
+    ByPath {
+        path: PathBuf,
+        mappings: Vec<EventMapping>,
+    },
+    ByName {
+        name: String,
+        mappings: Vec<EventMapping>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -70,6 +78,12 @@ pub struct FilteredKeyMapping {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ControllerId {
+    Path(PathBuf),
+    Name(String),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ControllerInputEvent {
     AbsAxis(AbsoluteAxisType),
     Key(KeyCode),
@@ -96,7 +110,7 @@ impl From<EventMapping> for ControllerInputEvent {
     }
 }
 
-pub type ConfigMap = HashMap<(String, ControllerInputEvent), EventMapping>;
+pub type ConfigMap = HashMap<(ControllerId, ControllerInputEvent), EventMapping>;
 pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     let file = File::open(path)?;
 
@@ -105,7 +119,7 @@ pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     let config_map: HashMap<_, _> = config
         .devices
         .into_iter()
-        .flat_map(|d| mappings_to_map(d.path, d.mappings))
+        .flat_map(mappings_to_map)
         .collect();
 
     println!("{:?}", config_map);
@@ -113,11 +127,15 @@ pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
 }
 
 fn mappings_to_map(
-    path: String,
-    mappings: Vec<EventMapping>,
-) -> HashMap<(String, ControllerInputEvent), EventMapping> {
+    config: DeviceConfig,
+) -> HashMap<(ControllerId, ControllerInputEvent), EventMapping> {
+    let (desc, mappings) = match config {
+        DeviceConfig::ByPath { path, mappings } => (ControllerId::Path(path), mappings),
+        DeviceConfig::ByName { name, mappings } => (ControllerId::Name(name), mappings),
+    };
+
     mappings
         .into_iter()
-        .map(|m| ((path.clone(), m.clone().into()), m))
+        .map(|m| ((desc.clone(), m.clone().into()), m))
         .collect()
 }

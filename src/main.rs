@@ -11,7 +11,7 @@ mod uinput;
 
 use args::Mode;
 use clap::Parser;
-use config::ConfigMap;
+use config::{ConfigMap, ControllerId};
 use error::FatalError;
 use ew_device::Device;
 use ew_types::{EventStream, InputEvent};
@@ -73,13 +73,16 @@ async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
     combine_devices(paths_and_devs, mappings, output_device).await
 }
 
-fn make_stream(path: String, device: Device) -> Result<(String, EventStream), FatalError> {
+fn make_stream(
+    id: ControllerId,
+    device: Device,
+) -> Result<(ControllerId, EventStream), FatalError> {
     let dev = device.into_event_stream()?;
-    Ok((path, dev))
+    Ok((id, dev))
 }
 
 async fn combine_devices(
-    devices: HashMap<String, Device>,
+    devices: HashMap<ControllerId, Device>,
     mappings: EventMapping,
     mut output_device: VirtualDevice,
 ) -> Result<(), Box<dyn Error>> {
@@ -100,9 +103,7 @@ async fn combine_devices(
         let event = futures.next().await;
         let result = match event {
             // Futures.next returned something that was ok
-            Some(Ok((path, event))) => {
-                process_single_event(path, event, &mappings, &mut output_device)
-            }
+            Some(Ok((id, event))) => process_single_event(id, event, &mappings, &mut output_device),
 
             // Futures.next returned something that was an error
             Some(Err(e)) => Err(e)?,
@@ -119,20 +120,20 @@ async fn combine_devices(
 }
 
 async fn next_event_with_meta(
-    path: &String,
+    id: &ControllerId,
     stream: &mut EventStream,
-) -> Result<(String, InputEvent), FatalError> {
+) -> Result<(ControllerId, InputEvent), FatalError> {
     let next_event = stream.next_event().await?;
-    Ok((path.to_owned(), next_event))
+    Ok((id.to_owned(), next_event))
 }
 
 fn process_single_event(
-    path: String,
+    id: ControllerId,
     event: InputEvent,
     mappings: &EventMapping,
     device: &mut VirtualDevice,
 ) -> Result<(), NonFatalError> {
-    let event = mappings.get_output_event(&path, &event)?;
+    let event = mappings.get_output_event(&id, &event)?;
     debug!("writing event {:?}", event);
     device.emit(&[event]).map_err(NonFatalError::Io)
 }

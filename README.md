@@ -38,9 +38,9 @@ Maps inputs from multiple input devices to a single virtual input device
     ```
 
 ## Configuration
-In the configuration file you can specify one or more inputs devices and how to represent events from those devices on a virtual input device
+In the configuration file you can specify one or more inputs devices by path or name and how to represent events from those devices on a virtual input device
 ```
-- path: <path to input device 1>
+- name: <name of input device 1>
   mappings:
     - input: <input 1>
       output: <output 1>
