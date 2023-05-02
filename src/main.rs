@@ -8,6 +8,7 @@ mod ew_uinput;
 mod mapping;
 mod output_event;
 mod uinput;
+mod util;
 
 use args::Mode;
 use clap::Parser;
@@ -63,7 +64,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
-    let paths: HashSet<_> = config.iter().map(|((p, _i), _m)| p.clone()).collect();
+    let paths: HashSet<_> = config.iter().map(|(ue, _m)| ue.id.clone()).collect();
     let paths_and_devs = device::open_devices(paths)?;
 
     let mappings = EventMapping::new(config, &paths_and_devs)?;

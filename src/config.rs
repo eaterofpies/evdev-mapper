@@ -110,7 +110,22 @@ impl From<EventMapping> for ControllerInputEvent {
     }
 }
 
-pub type ConfigMap = HashMap<(ControllerId, ControllerInputEvent), EventMapping>;
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct UniqueControllerEvent {
+    pub id: ControllerId,
+    pub event: ControllerInputEvent,
+}
+
+impl UniqueControllerEvent {
+    pub fn new(id: ControllerId, event: ControllerInputEvent) -> UniqueControllerEvent {
+        UniqueControllerEvent {
+            id: { id },
+            event: { event },
+        }
+    }
+}
+
+pub type ConfigMap = HashMap<UniqueControllerEvent, EventMapping>;
 pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     let file = File::open(path)?;
 
@@ -126,9 +141,7 @@ pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
     Ok(config_map)
 }
 
-fn mappings_to_map(
-    config: DeviceConfig,
-) -> HashMap<(ControllerId, ControllerInputEvent), EventMapping> {
+fn mappings_to_map(config: DeviceConfig) -> HashMap<UniqueControllerEvent, EventMapping> {
     let (desc, mappings) = match config {
         DeviceConfig::ByPath { path, mappings } => (ControllerId::Path(path), mappings),
         DeviceConfig::ByName { name, mappings } => (ControllerId::Name(name), mappings),
@@ -136,6 +149,11 @@ fn mappings_to_map(
 
     mappings
         .into_iter()
-        .map(|m| ((desc.clone(), m.clone().into()), m))
+        .map(|m| {
+            (
+                UniqueControllerEvent::new(desc.clone(), m.clone().into()),
+                m,
+            )
+        })
         .collect()
 }

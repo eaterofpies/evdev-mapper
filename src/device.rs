@@ -9,6 +9,7 @@ use crate::{
     error::FatalError,
     ew_device::Device,
     ew_types::{AbsInfo, AbsoluteAxisType, KeyCode},
+    util::rewrap,
 };
 
 pub struct DeviceInfo {
@@ -93,7 +94,7 @@ fn find_device_by_name(name: &String) -> Result<PathBuf, FatalError> {
     }
 }
 
-fn open_device(id: ControllerId) -> Result<(ControllerId, Device), FatalError> {
+fn open_device(id: ControllerId) -> Result<Device, FatalError> {
     let path = match &id {
         ControllerId::Path(path) => path.clone(),
         ControllerId::Name(name) => find_device_by_name(name)?,
@@ -105,7 +106,7 @@ fn open_device(id: ControllerId) -> Result<(ControllerId, Device), FatalError> {
     device.grab()?;
 
     print_properties(&device)?;
-    Ok((id, device))
+    Ok(device)
 }
 
 pub fn properties(path: String) -> Result<(), Error> {
@@ -117,8 +118,10 @@ pub fn properties(path: String) -> Result<(), Error> {
 pub fn open_devices(
     ids: HashSet<ControllerId>,
 ) -> Result<HashMap<ControllerId, Device>, FatalError> {
-    let devices_or_error: Result<HashMap<ControllerId, Device>, FatalError> =
-        ids.into_iter().map(open_device).collect();
+    let devices_or_error: Result<HashMap<ControllerId, Device>, FatalError> = ids
+        .into_iter()
+        .map(|id| rewrap(id.clone(), open_device(id)))
+        .collect();
 
     devices_or_error
 }

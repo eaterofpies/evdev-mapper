@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, ConfigMap, ControllerId, ControllerInputEvent},
+    config::{self, ConfigMap, ControllerId, ControllerInputEvent, UniqueControllerEvent},
     device::{get_device_info, DeviceInfo},
     error::{FatalError, NonFatalError},
     ew_device::Device,
@@ -8,11 +8,12 @@ use crate::{
         AbsAxisOutputEvent, FilteredAbsAxisOutputEvent, KeyOutputEvent, OutputEvent,
         SyncOutputEvent,
     },
+    util::rewrap,
 };
 use std::{collections::HashMap, io::Error};
 
 pub struct EventMapping {
-    mappings: HashMap<(ControllerId, ControllerInputEvent), OutputEvent>,
+    mappings: HashMap<UniqueControllerEvent, OutputEvent>,
 }
 
 impl EventMapping {
@@ -51,11 +52,9 @@ impl EventMapping {
     }
 
     fn make_mapping(
-        id: ControllerId,
-        event: ControllerInputEvent,
         mapping: config::EventMapping,
         device_info: &DeviceInfo,
-    ) -> Result<((ControllerId, ControllerInputEvent), OutputEvent), FatalError> {
+    ) -> Result<OutputEvent, FatalError> {
         let output = match mapping {
             config::EventMapping::KeyEvent { input: _, output } => {
                 OutputEvent::Key(KeyOutputEvent::new(output, 0))
@@ -65,41 +64,41 @@ impl EventMapping {
             }
         };
 
-        Ok(((id, event), output))
+        Ok(output)
     }
 
-    fn make_sync_mapping(id: ControllerId) -> ((ControllerId, ControllerInputEvent), OutputEvent) {
+    fn make_sync_mapping(id: ControllerId) -> (UniqueControllerEvent, OutputEvent) {
         let input = ControllerInputEvent::Synchronization(Synchronization(
             evdev::Synchronization::SYN_REPORT,
         ));
         let output = OutputEvent::Synchronization(SyncOutputEvent::new());
-        ((id, input), output)
+        (UniqueControllerEvent::new(id, input), output)
     }
 
     pub fn new(
         config: ConfigMap,
         paths_and_devs: &HashMap<ControllerId, Device>,
     ) -> Result<Self, FatalError> {
-        let path_and_info_or_error: Result<HashMap<_, _>, Error> = paths_and_devs
+        let id_and_info_or_error: Result<HashMap<_, _>, Error> = paths_and_devs
             .iter()
             .map(|(p, d)| Self::get_device_info(p.clone(), d))
             .collect();
 
-        let path_and_info = path_and_info_or_error?;
+        let id_and_info = id_and_info_or_error?;
 
-        let input_mappings_or_error: Result<HashMap<(_, _), _>, FatalError> = config
+        let input_mappings_or_error: Result<HashMap<_, _>, FatalError> = config
             .into_iter()
-            .map(|((p, i), m)| Self::make_mapping(p.clone(), i, m, &path_and_info[&p]))
+            .map(|(ue, m)| rewrap(ue.clone(), Self::make_mapping(m, &id_and_info[&ue.id])))
             .collect();
 
         let input_mappings = input_mappings_or_error?;
 
-        let builtins: HashMap<(_, _), _> = paths_and_devs
+        let builtins: HashMap<_, _> = paths_and_devs
             .iter()
             .map(|(i, _)| Self::make_sync_mapping(i.clone()))
             .collect();
 
-        let mappings: HashMap<(_, _), _> = input_mappings
+        let mappings: HashMap<_, _> = input_mappings
             .into_iter()
             .chain(builtins.into_iter())
             .collect();
@@ -114,7 +113,9 @@ impl EventMapping {
     ) -> Result<OutputEvent, NonFatalError> {
         let input_event = ControllerInputEvent::try_from(event)?;
 
-        let output_event = self.mappings.get(&(id.clone(), input_event));
+        let output_event = self
+            .mappings
+            .get(&UniqueControllerEvent::new(id.clone(), input_event));
 
         match output_event {
             Some(ev) => Ok(ev.clone_set_value(event.0.value())),
