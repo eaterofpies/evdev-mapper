@@ -19,8 +19,9 @@ use ew_types::{EventStream, InputEvent};
 use ew_uinput::VirtualDevice;
 use futures::stream::{FuturesUnordered, StreamExt};
 use log::{debug, error, warn};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
+use util::rewrap;
 
 use mapping::EventMapping;
 use uinput::new_device;
@@ -43,7 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Mode::Properties => {
             match args.device {
                 Some(device_path) => device::properties(device_path)?,
-                None => log::error!("Device must be set in 'properties' mode."),
+                None => error!("Device must be set in 'properties' mode."),
             }
             Ok(())
         }
@@ -64,8 +65,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
-    let paths: HashSet<_> = config.iter().map(|(ue, _m)| ue.id.clone()).collect();
-    let paths_and_devs = device::open_devices(paths)?;
+    let paths_and_devs_or_error: Result<HashMap<ControllerId, Device>, FatalError> = config
+        .iter()
+        .map(|(ue, _m)| rewrap(ue.id.clone(), device::open_device(&ue.id)))
+        .collect();
+
+    let paths_and_devs = paths_and_devs_or_error?;
 
     let mappings = EventMapping::new(config, &paths_and_devs)?;
 
@@ -130,11 +135,11 @@ async fn next_event_with_meta(
 
 fn process_single_event(
     id: ControllerId,
-    event: InputEvent,
+    input_event: InputEvent,
     mappings: &EventMapping,
     device: &mut VirtualDevice,
 ) -> Result<(), NonFatalError> {
-    let event = mappings.get_output_event(&id, &event)?;
+    let event = mappings.get_output_event(id, input_event)?;
     debug!("writing event {:?}", event);
     device.emit(&[event]).map_err(NonFatalError::Io)
 }

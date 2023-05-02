@@ -4,7 +4,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize)]
 pub struct AbsoluteAxisType(pub evdev::AbsoluteAxisType);
 
 impl Deref for AbsoluteAxisType {
@@ -29,7 +29,7 @@ impl PartialEq for AbsoluteAxisType {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize)]
 pub struct KeyCode(pub evdev::Key);
 
 impl Deref for KeyCode {

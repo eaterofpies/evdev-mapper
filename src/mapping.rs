@@ -17,13 +17,6 @@ pub struct EventMapping {
 }
 
 impl EventMapping {
-    fn get_device_info(
-        id: ControllerId,
-        device: &Device,
-    ) -> Result<(ControllerId, DeviceInfo), Error> {
-        Ok((id, get_device_info(device)?))
-    }
-
     fn make_abs_axis_mapping(
         device_info: &DeviceInfo,
         axis_type: AbsoluteAxisType,
@@ -44,7 +37,7 @@ impl EventMapping {
                 axis_info: *axis_info,
             }),
             config::AbsAxisEvent::FilteredKeys(f) => OutputEvent::FilteredAbsAxis(
-                FilteredAbsAxisOutputEvent::new(axis_type.clone(), *axis_info, f),
+                FilteredAbsAxisOutputEvent::new(axis_type, *axis_info, f),
             ),
         };
 
@@ -81,14 +74,17 @@ impl EventMapping {
     ) -> Result<Self, FatalError> {
         let id_and_info_or_error: Result<HashMap<_, _>, Error> = paths_and_devs
             .iter()
-            .map(|(p, d)| Self::get_device_info(p.clone(), d))
+            .map(|(id, d)| rewrap(id, get_device_info(d)))
             .collect();
 
         let id_and_info = id_and_info_or_error?;
 
         let input_mappings_or_error: Result<HashMap<_, _>, FatalError> = config
             .into_iter()
-            .map(|(ue, m)| rewrap(ue.clone(), Self::make_mapping(m, &id_and_info[&ue.id])))
+            .map(|(ue, m)| {
+                let info = &id_and_info[&ue.id];
+                rewrap(ue, Self::make_mapping(m, info))
+            })
             .collect();
 
         let input_mappings = input_mappings_or_error?;
@@ -108,20 +104,20 @@ impl EventMapping {
 
     pub fn get_output_event(
         &self,
-        id: &ControllerId,
-        event: &InputEvent,
+        id: ControllerId,
+        input_event: InputEvent,
     ) -> Result<OutputEvent, NonFatalError> {
-        let input_event = ControllerInputEvent::try_from(event)?;
+        let value = input_event.0.value();
+        let event: ControllerInputEvent = input_event.try_into()?;
+        let ue = UniqueControllerEvent::new(id, event);
 
-        let output_event = self
-            .mappings
-            .get(&UniqueControllerEvent::new(id.clone(), input_event));
+        let output_event = self.mappings.get(&ue);
 
         match output_event {
-            Some(ev) => Ok(ev.clone_set_value(event.0.value())),
+            Some(ev) => Ok(ev.clone_set_value(value)),
             None => Err(NonFatalError::from(format!(
                 "No mapping for event type {:?}",
-                event
+                ue.event
             ))),
         }
     }

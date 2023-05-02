@@ -12,7 +12,7 @@ pub struct AbsAxisOutputEvent {
 impl AbsAxisOutputEvent {
     pub fn clone_set_value(&self, value: i32) -> Self {
         AbsAxisOutputEvent {
-            axis_type: self.axis_type.clone(),
+            axis_type: self.axis_type,
             axis_info: self.axis_info.clone_set_value(value),
         }
     }
@@ -38,7 +38,7 @@ impl KeyOutputEvent {
     }
 
     pub fn code(&self) -> KeyCode {
-        self.code.clone()
+        self.code
     }
 
     pub fn value(&self) -> i32 {
@@ -104,12 +104,12 @@ impl FilteredAbsAxisOutputEvent {
         }
     }
     pub fn codes(&self) -> Vec<KeyCode> {
-        self.mappings.iter().map(|f| f.key.clone()).collect()
+        self.mappings.iter().map(|f| f.key).collect()
     }
 
     pub fn clone_set_value(&self, value: i32) -> Self {
         FilteredAbsAxisOutputEvent {
-            axis_type: self.axis_type.clone(),
+            axis_type: self.axis_type,
             axis_info: self.axis_info.clone_set_value(value),
             mappings: self.mappings.clone(),
         }

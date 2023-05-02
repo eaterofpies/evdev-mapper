@@ -51,10 +51,10 @@ impl From<AbsoluteAxisType> for AbsAxisEvent {
     }
 }
 
-impl TryFrom<&InputEvent> for ControllerInputEvent {
+impl TryFrom<InputEvent> for ControllerInputEvent {
     type Error = NonFatalError;
 
-    fn try_from(event: &InputEvent) -> Result<Self, NonFatalError> {
+    fn try_from(event: InputEvent) -> Result<Self, NonFatalError> {
         match event.kind() {
             InputEventKind::Synchronization(s) => Ok(ControllerInputEvent::Synchronization(
                 ew_types::Synchronization(s),
@@ -142,18 +142,13 @@ pub fn read(path: &String) -> Result<ConfigMap, FatalError> {
 }
 
 fn mappings_to_map(config: DeviceConfig) -> HashMap<UniqueControllerEvent, EventMapping> {
-    let (desc, mappings) = match config {
+    let (id, mappings) = match config {
         DeviceConfig::ByPath { path, mappings } => (ControllerId::Path(path), mappings),
         DeviceConfig::ByName { name, mappings } => (ControllerId::Name(name), mappings),
     };
 
     mappings
         .into_iter()
-        .map(|m| {
-            (
-                UniqueControllerEvent::new(desc.clone(), m.clone().into()),
-                m,
-            )
-        })
+        .map(|m| (UniqueControllerEvent::new(id.clone(), m.clone().into()), m))
         .collect()
 }
