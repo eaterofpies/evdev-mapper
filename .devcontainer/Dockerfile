@@ -1,4 +1,4 @@
-FROM rust:1.64-slim-bullseye
+FROM rust:1.73-slim-bookworm
 
 ARG USERNAME=vscode
 ARG USER_UID=1000
