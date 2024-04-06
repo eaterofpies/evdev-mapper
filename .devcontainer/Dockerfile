@@ -1,6 +1,6 @@
-FROM rust:1.73-slim-bookworm
+FROM rust:1.77-slim-bookworm
 
-ARG USERNAME=vscode
+ARG USERNAME=vscode 
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
