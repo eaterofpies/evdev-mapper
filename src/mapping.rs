@@ -62,7 +62,7 @@ impl EventMapping {
 
     fn make_sync_mapping(id: ControllerId) -> (UniqueControllerEvent, OutputEvent) {
         let input = ControllerInputEvent::Synchronization(Synchronization(
-            evdev::Synchronization::SYN_REPORT,
+            evdev::SynchronizationCode::SYN_REPORT,
         ));
         let output = OutputEvent::Synchronization(SyncOutputEvent::new());
         (UniqueControllerEvent::new(id, input), output)
