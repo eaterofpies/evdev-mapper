@@ -2,7 +2,7 @@ use crate::{
     error::{FatalError, NonFatalError},
     ew_types::{self, AbsoluteAxisType, InputEvent, KeyCode, Synchronization},
 };
-use evdev::InputEventKind;
+use evdev::EventSummary;
 use serde::Deserialize;
 use std::{collections::HashMap, fs::File, path::PathBuf};
 
@@ -56,12 +56,12 @@ impl TryFrom<InputEvent> for ControllerInputEvent {
 
     fn try_from(event: InputEvent) -> Result<Self, NonFatalError> {
         match event.kind() {
-            InputEventKind::Synchronization(s) => Ok(ControllerInputEvent::Synchronization(
-                ew_types::Synchronization(s),
+            EventSummary::Synchronization(_e, c, _v) => Ok(ControllerInputEvent::Synchronization(
+                ew_types::Synchronization(c),
             )),
-            InputEventKind::Key(k) => Ok(ControllerInputEvent::Key(ew_types::KeyCode(k))),
-            InputEventKind::AbsAxis(a) => {
-                Ok(ControllerInputEvent::AbsAxis(ew_types::AbsoluteAxisType(a)))
+            EventSummary::Key(_e, c, _v) => Ok(ControllerInputEvent::Key(ew_types::KeyCode(c))),
+            EventSummary::AbsoluteAxis(_e, c, _vv) => {
+                Ok(ControllerInputEvent::AbsAxis(ew_types::AbsoluteAxisType(c)))
             }
             _ => Err(NonFatalError::from(
                 "Conversion from {:?} to ControllerEvent not implemented",

@@ -1,18 +1,18 @@
 use std::{io::Error, path::PathBuf};
 
-use evdev::{uinput::VirtualDeviceBuilder, AttributeSet, UinputAbsSetup};
+use evdev::{uinput, AttributeSet, UinputAbsSetup};
 
 use crate::output_event::OutputEvent;
 
-pub struct VirtualDevice(evdev::uinput::VirtualDevice);
+pub struct VirtualDevice(uinput::VirtualDevice);
 
 fn make_uniput_config(
     output_actions: Vec<&OutputEvent>,
-) -> (Vec<UinputAbsSetup>, AttributeSet<evdev::Key>) {
+) -> (Vec<UinputAbsSetup>, AttributeSet<evdev::KeyCode>) {
     // Need to build a list of all keys to pass to the builder
     // so we may as well extract the axis too
     let mut all_axis: Vec<UinputAbsSetup> = Vec::new();
-    let mut keys: AttributeSet<evdev::Key> = AttributeSet::new();
+    let mut keys: AttributeSet<evdev::KeyCode> = AttributeSet::new();
     for event in output_actions {
         match event {
             OutputEvent::AbsAxis(a) => {
@@ -34,9 +34,9 @@ fn make_uniput_config(
 
 fn build_device(
     all_axis: Vec<UinputAbsSetup>,
-    keys: AttributeSet<evdev::Key>,
+    keys: AttributeSet<evdev::KeyCode>,
 ) -> Result<VirtualDevice, Error> {
-    let builder = VirtualDeviceBuilder::new()?;
+    let builder = uinput::VirtualDevice::builder()?;
     let mut builder = builder.name("evdev-mapper gamepad").with_keys(&keys)?;
 
     for axis in all_axis {

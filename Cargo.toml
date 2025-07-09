@@ -6,11 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 # https://github.com/emberian/evdev
-evdev = { version = "0.12.1", features = ["tokio", "serde"] }
-tokio = { version = "1.45.0", features = ["full"] }
+evdev = { version = "0.13.1", features = ["tokio", "serde"] }
+tokio = { version = "1.46.1", features = ["full"] }
 futures = "0.3.31"
 serde = { version = "1.0.219", features = ["derive"] }
-serde_yaml = "0.9.34"
-clap = { version = "4.5.38", features = ["derive"] }
+serde_yaml = "0.9.34-deprecated"
+clap = { version = "4.5.40", features = ["derive"] }
 env_logger = "0.11.8"
 log = "0.4.27"

@@ -30,7 +30,7 @@
 			"extensions": [
 				"rust-lang.rust-analyzer",
 				"tamasfe.even-better-toml",
-				"serayuzgur.crates",
+				"fill-labs.dependi",
 				"ms-azuretools.vscode-docker"
 			]
 		}

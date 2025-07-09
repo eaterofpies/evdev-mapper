@@ -5,10 +5,10 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
-pub struct AbsoluteAxisType(pub evdev::AbsoluteAxisType);
+pub struct AbsoluteAxisType(pub evdev::AbsoluteAxisCode);
 
 impl Deref for AbsoluteAxisType {
-    type Target = evdev::AbsoluteAxisType;
+    type Target = evdev::AbsoluteAxisCode;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -30,10 +30,10 @@ impl PartialEq for AbsoluteAxisType {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
-pub struct KeyCode(pub evdev::Key);
+pub struct KeyCode(pub evdev::KeyCode);
 
 impl Deref for KeyCode {
-    type Target = evdev::Key;
+    type Target = evdev::KeyCode;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -84,7 +84,7 @@ impl fmt::Debug for AbsInfo {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq)]
-pub struct Synchronization(pub evdev::Synchronization);
+pub struct Synchronization(pub evdev::SynchronizationCode);
 
 impl Hash for Synchronization {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -102,11 +102,11 @@ impl PartialEq for Synchronization {
 pub struct InputEvent(pub evdev::InputEvent);
 impl InputEvent {
     pub fn new(type_: EventType, code: u16, value: i32) -> Self {
-        Self(evdev::InputEvent::new(type_, code, value))
+        Self(evdev::InputEvent::new(type_.0, code, value))
     }
 
-    pub fn kind(&self) -> evdev::InputEventKind {
-        self.0.kind()
+    pub fn kind(&self) -> evdev::EventSummary {
+        self.0.destructure()
     }
 }
 

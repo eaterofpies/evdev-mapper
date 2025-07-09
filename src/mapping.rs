@@ -62,7 +62,7 @@ impl EventMapping {
 
     fn make_sync_mapping(id: ControllerId) -> (UniqueControllerEvent, OutputEvent) {
         let input = ControllerInputEvent::Synchronization(Synchronization(
-            evdev::Synchronization::SYN_REPORT,
+            evdev::SynchronizationCode::SYN_REPORT,
         ));
         let output = OutputEvent::Synchronization(SyncOutputEvent::new());
         (UniqueControllerEvent::new(id, input), output)
@@ -94,10 +94,7 @@ impl EventMapping {
             .map(|(i, _)| Self::make_sync_mapping(i.clone()))
             .collect();
 
-        let mappings: HashMap<_, _> = input_mappings
-            .into_iter()
-            .chain(builtins.into_iter())
-            .collect();
+        let mappings: HashMap<_, _> = input_mappings.into_iter().chain(builtins).collect();
 
         Ok(EventMapping { mappings })
     }
@@ -123,6 +120,6 @@ impl EventMapping {
     }
 
     pub fn list_output_events(&self) -> Vec<&OutputEvent> {
-        self.mappings.iter().map(|(_, m)| m).collect()
+        self.mappings.values().collect()
     }
 }
