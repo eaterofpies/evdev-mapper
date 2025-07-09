@@ -66,8 +66,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 async fn run(config: ConfigMap) -> Result<(), Box<dyn Error>> {
     let paths_and_devs_or_error: Result<HashMap<ControllerId, Device>, FatalError> = config
-        .iter()
-        .map(|(ue, _m)| rewrap(ue.id.clone(), device::open_device(&ue.id)))
+        .keys()
+        .map(|ue| rewrap(ue.id.clone(), device::open_device(&ue.id)))
         .collect();
 
     let paths_and_devs = paths_and_devs_or_error?;
